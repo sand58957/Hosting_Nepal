@@ -547,8 +547,11 @@ const VPSDetailPage = () => {
     setActionLoading('dns')
     try {
       await api.post(`/hosting/vps/${serverId}/addons`, {
-        type: 'dns-record',
-        ...newDns,
+        addonType: 'dns-record',
+        recordType: newDns.type,
+        name: newDns.name,
+        value: newDns.value,
+        ttl: newDns.ttl,
       })
       setDnsDialogOpen(false)
       setNewDns({ type: 'A', name: '', value: '', ttl: 3600 })
