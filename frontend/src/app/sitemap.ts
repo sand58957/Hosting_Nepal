@@ -3,36 +3,33 @@ import type { MetadataRoute } from 'next'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001/api/v1'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://hostingnepals.com'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hostingnepals.com'
+  const now = new Date()
 
   const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
-    { url: `${baseUrl}/home`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
-    { url: `${baseUrl}/articles`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
+    { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1 },
+    { url: `${baseUrl}/home`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${baseUrl}/articles`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
   ]
 
   try {
-    // Fetch all posts by paginating
-    const allPosts: any[] = []
-    let page = 1
-    let hasMore = true
+    // First page to get totalPages
+    const firstRes = await fetch(`${API_URL}/blog/posts?limit=50&page=1`, { next: { revalidate: 300 } })
+    const firstJson = await firstRes.json()
+    const allPosts: any[] = firstJson?.data?.data || []
+    const totalPages = Math.min(firstJson?.data?.meta?.totalPages || 1, 20)
 
-    while (hasMore) {
-      const res = await fetch(`${API_URL}/blog/posts?limit=50&page=${page}`, { next: { revalidate: 300 } })
-      const json = await res.json()
-      const posts = json?.data?.data || []
-      const meta = json?.data?.meta
+    // Fetch remaining pages in parallel
+    if (totalPages > 1) {
+      const remaining = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          fetch(`${API_URL}/blog/posts?limit=50&page=${i + 2}`, { next: { revalidate: 300 } }).then(r => r.json())
+        )
+      )
 
-      allPosts.push(...posts)
-
-      if (!meta || page >= (meta.totalPages || 1)) {
-        hasMore = false
+      for (const json of remaining) {
+        allPosts.push(...(json?.data?.data || []))
       }
-
-      page++
-
-      // Safety limit
-      if (page > 20) break
     }
 
     const blogPages: MetadataRoute.Sitemap = allPosts.map((post: any) => ({
