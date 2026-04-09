@@ -1,0 +1,866 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  RESELLER
+  SUPPORT_AGENT
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum DomainStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  PENDING_REGISTRATION
+  PENDING_TRANSFER
+  PENDING_DELETION
+  DELETED
+}
+
+enum HostingProvider {
+  RESELLERCLUB
+  CONTABO
+  CUSTOM
+}
+
+enum HostingPlanType {
+  SHARED
+  WORDPRESS
+  CLOUD
+  VPS
+  DEDICATED
+  RESELLER
+}
+
+enum HostingStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  PENDING_SETUP
+  PROVISIONING
+  CANCELLED
+  DELETED
+}
+
+enum WpSiteStatus {
+  ACTIVE
+  STAGING
+  MAINTENANCE
+  SUSPENDED
+  DELETED
+}
+
+enum SslType {
+  DV
+  OV
+  EV
+  WILDCARD
+  MULTI_DOMAIN
+  LETS_ENCRYPT
+}
+
+enum SslProvider {
+  RESELLERCLUB
+  LETS_ENCRYPT
+  COMODO
+  GEOTRUST
+  RAPID_SSL
+}
+
+enum SslStatus {
+  ACTIVE
+  EXPIRED
+  PENDING_ISSUANCE
+  PENDING_VALIDATION
+  REVOKED
+  CANCELLED
+}
+
+enum EmailProvider {
+  RESELLERCLUB
+  TITAN
+  GOOGLE_WORKSPACE
+}
+
+enum EmailStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  PENDING_SETUP
+  CANCELLED
+}
+
+enum ServiceType {
+  DOMAIN_REGISTRATION
+  DOMAIN_RENEWAL
+  DOMAIN_TRANSFER
+  HOSTING_NEW
+  HOSTING_RENEWAL
+  HOSTING_UPGRADE
+  SSL_NEW
+  SSL_RENEWAL
+  EMAIL_NEW
+  EMAIL_RENEWAL
+  BACKUP
+  ADDON
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentGateway {
+  KHALTI
+  ESEWA
+  BANK_TRANSFER
+  WALLET
+  ADMIN_CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  VOID
+}
+
+enum TicketCategory {
+  BILLING
+  TECHNICAL
+  DOMAIN
+  HOSTING
+  SSL
+  EMAIL
+  GENERAL
+  ABUSE
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  WAITING_ON_STAFF
+  RESOLVED
+  CLOSED
+}
+
+enum ResellerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_APPROVAL
+}
+
+enum BackupType {
+  FULL
+  INCREMENTAL
+  DATABASE_ONLY
+  FILES_ONLY
+}
+
+enum BackupStorageProvider {
+  LOCAL
+  S3
+  GOOGLE_CLOUD
+  BACKBLAZE
+}
+
+enum BackupStatus {
+  COMPLETED
+  IN_PROGRESS
+  FAILED
+  DELETED
+}
+
+enum UptimeStatus {
+  UP
+  DOWN
+  DEGRADED
+  PAUSED
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  IN_APP
+  PUSH
+}
+
+enum NotificationCategory {
+  BILLING
+  DOMAIN
+  HOSTING
+  SSL
+  SECURITY
+  SYSTEM
+  PROMOTIONAL
+  SUPPORT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum PromoStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum SagaStatus {
+  STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  COMPENSATING
+  COMPENSATED
+}
+
+enum IpVersion {
+  IPv4
+  IPv6
+}
+
+enum IpStatus {
+  AVAILABLE
+  ALLOCATED
+  RESERVED
+  BLACKLISTED
+}
+
+enum IpAssignedType {
+  HOSTING
+  VPS
+  DEDICATED
+  SSL
+}
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
+}
+
+// ─── Models ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id                  String       @id @default(uuid()) @db.Uuid
+  email               String       @unique @db.VarChar(255)
+  phone               String?      @db.VarChar(20)
+  passwordHash        String       @map("password_hash") @db.VarChar(255)
+  name                String       @db.VarChar(255)
+  companyName         String?      @map("company_name") @db.VarChar(255)
+  role                UserRole     @default(CUSTOMER)
+  status              UserStatus   @default(PENDING_VERIFICATION)
+  twoFactorEnabled    Boolean      @default(false) @map("two_factor_enabled")
+  twoFactorSecret     String?      @map("two_factor_secret") @db.VarChar(255)
+  rcCustomerId        String?      @map("rc_customer_id") @db.VarChar(100)
+  preferredLanguage   String       @default("en") @map("preferred_language") @db.VarChar(10)
+  emailVerified       Boolean      @default(false) @map("email_verified")
+  phoneVerified       Boolean      @default(false) @map("phone_verified")
+  lastLoginAt         DateTime?    @map("last_login_at")
+  lastLoginIp                 String?      @map("last_login_ip") @db.VarChar(45)
+  refreshToken                String?      @map("refresh_token") @db.VarChar(255)
+  verificationToken           String?      @map("verification_token") @db.VarChar(255)
+  verificationTokenExpiry     DateTime?    @map("verification_token_expiry")
+  resetPasswordToken          String?      @map("reset_password_token") @db.VarChar(255)
+  resetPasswordTokenExpiry    DateTime?    @map("reset_password_token_expiry")
+  createdAt                   DateTime     @default(now()) @map("created_at")
+  updatedAt                   DateTime     @updatedAt @map("updated_at")
+
+  domains             Domain[]
+  hostingAccounts     HostingAccount[]
+  emailAccounts       EmailAccount[]
+  orders              Order[]
+  payments            Payment[]
+  invoices            Invoice[]
+  supportTickets      SupportTicket[]      @relation("UserTickets")
+  assignedTickets     SupportTicket[]      @relation("AssignedTickets")
+  ticketMessages      TicketMessage[]
+  reseller            Reseller?
+  activityLogs        ActivityLog[]
+  notifications       Notification[]
+  blogPosts           BlogPost[]
+
+  @@index([email])
+  @@index([rcCustomerId])
+  @@index([status])
+  @@map("users")
+}
+
+model Domain {
+  id                  String       @id @default(uuid()) @db.Uuid
+  userId              String       @map("user_id") @db.Uuid
+  domainName          String       @map("domain_name") @db.VarChar(255)
+  tld                 String       @db.VarChar(20)
+  rcOrderId           String?      @map("rc_order_id") @db.VarChar(100)
+  status              DomainStatus @default(PENDING_REGISTRATION)
+  registrationDate    DateTime?    @map("registration_date")
+  expiryDate          DateTime?    @map("expiry_date")
+  autoRenew           Boolean      @default(true) @map("auto_renew")
+  privacyProtection   Boolean      @default(false) @map("privacy_protection")
+  theftProtection     Boolean      @default(false) @map("theft_protection")
+  nameservers         Json?        @default("[]")
+  dnsRecords          Json?        @default("[]") @map("dns_records")
+  whoisContactId      String?      @map("whois_contact_id") @db.VarChar(100)
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hostingAccounts     HostingAccount[]
+  wordPressSites      WordPressSite[]
+  sslCertificates     SslCertificate[]
+  emailAccounts       EmailAccount[]
+
+  @@unique([domainName, tld])
+  @@index([userId])
+  @@index([status])
+  @@index([expiryDate])
+  @@index([rcOrderId])
+  @@map("domains")
+}
+
+model HostingAccount {
+  id                        String          @id @default(uuid()) @db.Uuid
+  userId                    String          @map("user_id") @db.Uuid
+  domainId                  String?         @map("domain_id") @db.Uuid
+  provider                  HostingProvider @default(RESELLERCLUB)
+  planType                  HostingPlanType @map("plan_type")
+  planName                  String          @map("plan_name") @db.VarChar(100)
+  rcOrderId                 String?         @map("rc_order_id") @db.VarChar(100)
+  serverId                  String?         @map("server_id") @db.VarChar(100)
+  cpanelUsername             String?         @map("cpanel_username") @db.VarChar(100)
+  cpanelPasswordEncrypted   String?         @map("cpanel_password_encrypted") @db.Text
+  ipAddress                 String?         @map("ip_address") @db.VarChar(45)
+  diskSpaceMb               Int             @default(0) @map("disk_space_mb")
+  bandwidthMb               Int             @default(0) @map("bandwidth_mb")
+  diskUsedMb                Int             @default(0) @map("disk_used_mb")
+  bandwidthUsedMb           Int             @default(0) @map("bandwidth_used_mb")
+  phpVersion                String?         @map("php_version") @db.VarChar(10)
+  status                    HostingStatus   @default(PENDING_SETUP)
+  provisionedAt             DateTime?       @map("provisioned_at")
+  expiryDate                DateTime?       @map("expiry_date")
+  autoRenew                 Boolean         @default(true) @map("auto_renew")
+  createdAt                 DateTime        @default(now()) @map("created_at")
+  updatedAt                 DateTime        @updatedAt @map("updated_at")
+
+  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain                    Domain?         @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  wordPressSites            WordPressSite[]
+  backups                   Backup[]
+  uptimeChecks              UptimeCheck[]
+
+  @@index([userId])
+  @@index([domainId])
+  @@index([status])
+  @@index([expiryDate])
+  @@index([rcOrderId])
+  @@map("hosting_accounts")
+}
+
+model WordPressSite {
+  id                      String        @id @default(uuid()) @db.Uuid
+  hostingId               String        @map("hosting_id") @db.Uuid
+  domainId                String?       @map("domain_id") @db.Uuid
+  wpVersion               String?       @map("wp_version") @db.VarChar(20)
+  phpVersion              String?       @map("php_version") @db.VarChar(10)
+  adminUrl                String?       @map("admin_url") @db.VarChar(500)
+  stagingUrl              String?       @map("staging_url") @db.VarChar(500)
+  stagingActive           Boolean       @default(false) @map("staging_active")
+  autoUpdatesEnabled      Boolean       @default(true) @map("auto_updates_enabled")
+  redisEnabled            Boolean       @default(false) @map("redis_enabled")
+  litespeedCacheEnabled   Boolean       @default(false) @map("litespeed_cache_enabled")
+  lastBackupAt            DateTime?     @map("last_backup_at")
+  lastMalwareScanAt       DateTime?     @map("last_malware_scan_at")
+  coreWebVitals           Json?         @map("core_web_vitals")
+  installedPlugins        Json?         @default("[]") @map("installed_plugins")
+  installedThemes         Json?         @default("[]") @map("installed_themes")
+  status                  WpSiteStatus  @default(ACTIVE)
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  hosting                 HostingAccount @relation(fields: [hostingId], references: [id], onDelete: Cascade)
+  domain                  Domain?        @relation(fields: [domainId], references: [id], onDelete: SetNull)
+
+  @@index([hostingId])
+  @@index([domainId])
+  @@map("wordpress_sites")
+}
+
+model SslCertificate {
+  id                      String       @id @default(uuid()) @db.Uuid
+  domainId                String       @map("domain_id") @db.Uuid
+  type                    SslType
+  provider                SslProvider
+  rcOrderId               String?      @map("rc_order_id") @db.VarChar(100)
+  status                  SslStatus    @default(PENDING_ISSUANCE)
+  issuedDate              DateTime?    @map("issued_date")
+  expiryDate              DateTime?    @map("expiry_date")
+  autoRenew               Boolean      @default(true) @map("auto_renew")
+  csr                     String?      @db.Text
+  certificate             String?      @db.Text
+  privateKeyEncrypted     String?      @map("private_key_encrypted") @db.Text
+  createdAt               DateTime     @default(now()) @map("created_at")
+  updatedAt               DateTime     @updatedAt @map("updated_at")
+
+  domain                  Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@index([domainId])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("ssl_certificates")
+}
+
+model EmailAccount {
+  id                  String        @id @default(uuid()) @db.Uuid
+  userId              String        @map("user_id") @db.Uuid
+  domainId            String        @map("domain_id") @db.Uuid
+  emailAddress        String        @map("email_address") @db.VarChar(255)
+  provider            EmailProvider
+  rcOrderId           String?       @map("rc_order_id") @db.VarChar(100)
+  planName            String        @map("plan_name") @db.VarChar(100)
+  mailboxCount        Int           @default(1) @map("mailbox_count")
+  storageGb           Float         @default(1) @map("storage_gb")
+  status              EmailStatus   @default(PENDING_SETUP)
+  expiryDate          DateTime?     @map("expiry_date")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain              Domain        @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domainId])
+  @@index([status])
+  @@map("email_accounts")
+}
+
+model Order {
+  id                  String       @id @default(uuid()) @db.Uuid
+  userId              String       @map("user_id") @db.Uuid
+  orderNumber         String       @unique @map("order_number") @db.VarChar(50)
+  serviceType         ServiceType  @map("service_type")
+  serviceId           String?      @map("service_id") @db.Uuid
+  planName            String?      @map("plan_name") @db.VarChar(100)
+  durationMonths      Int          @default(12) @map("duration_months")
+  amountNpr           Float        @map("amount_npr")
+  vatAmountNpr        Float        @default(0) @map("vat_amount_npr")
+  totalAmountNpr      Float        @map("total_amount_npr")
+  discountAmountNpr   Float        @default(0) @map("discount_amount_npr")
+  promoCode           String?      @map("promo_code") @db.VarChar(50)
+  status              OrderStatus  @default(PENDING)
+  paymentId           String?      @map("payment_id") @db.Uuid
+  notes               String?      @db.Text
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments            Payment[]
+  invoices            Invoice[]
+  sagas               Saga[]
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([serviceType])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model Payment {
+  id                      String         @id @default(uuid()) @db.Uuid
+  orderId                 String         @map("order_id") @db.Uuid
+  userId                  String         @map("user_id") @db.Uuid
+  gateway                 PaymentGateway
+  gatewayTransactionId    String?        @map("gateway_transaction_id") @db.VarChar(255)
+  gatewayReference        String?        @map("gateway_reference") @db.VarChar(255)
+  amountNpr               Float          @map("amount_npr")
+  status                  PaymentStatus  @default(PENDING)
+  paymentUrl              String?        @map("payment_url") @db.VarChar(1000)
+  callbackData            Json?          @map("callback_data")
+  verifiedAt              DateTime?      @map("verified_at")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  order                   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([gatewayTransactionId])
+  @@map("payments")
+}
+
+model Invoice {
+  id                  String        @id @default(uuid()) @db.Uuid
+  userId              String        @map("user_id") @db.Uuid
+  orderId             String        @map("order_id") @db.Uuid
+  invoiceNumber       String        @unique @map("invoice_number") @db.VarChar(50)
+  subtotalNpr         Float         @map("subtotal_npr")
+  vatRate             Float         @default(13) @map("vat_rate")
+  vatAmountNpr        Float         @map("vat_amount_npr")
+  totalNpr            Float         @map("total_npr")
+  status              InvoiceStatus @default(DRAFT)
+  dueDate             DateTime      @map("due_date")
+  paidAt              DateTime?     @map("paid_at")
+  pdfUrl              String?       @map("pdf_url") @db.VarChar(500)
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order               Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model SupportTicket {
+  id                  String         @id @default(uuid()) @db.Uuid
+  userId              String         @map("user_id") @db.Uuid
+  assignedTo          String?        @map("assigned_to") @db.Uuid
+  ticketNumber        String         @unique @map("ticket_number") @db.VarChar(20)
+  subject             String         @db.VarChar(500)
+  category            TicketCategory
+  priority            TicketPriority @default(MEDIUM)
+  status              TicketStatus   @default(OPEN)
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  resolvedAt          DateTime?      @map("resolved_at")
+
+  user                User           @relation("UserTickets", fields: [userId], references: [id], onDelete: Cascade)
+  assignee            User?          @relation("AssignedTickets", fields: [assignedTo], references: [id], onDelete: SetNull)
+  messages            TicketMessage[]
+
+  @@index([userId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([priority])
+  @@index([ticketNumber])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id                  String        @id @default(uuid()) @db.Uuid
+  ticketId            String        @map("ticket_id") @db.Uuid
+  senderId            String        @map("sender_id") @db.Uuid
+  message             String        @db.Text
+  attachments         Json?         @default("[]")
+  isInternal          Boolean       @default(false) @map("is_internal")
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  ticket              SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender              User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([senderId])
+  @@map("ticket_messages")
+}
+
+model Reseller {
+  id                  String         @id @default(uuid()) @db.Uuid
+  userId              String         @unique @map("user_id") @db.Uuid
+  companyName         String         @map("company_name") @db.VarChar(255)
+  brandLogoUrl        String?        @map("brand_logo_url") @db.VarChar(500)
+  brandColors         Json?          @default("{}") @map("brand_colors")
+  customDomain        String?        @map("custom_domain") @db.VarChar(255)
+  customNameservers   Json?          @default("[]") @map("custom_nameservers")
+  rcResellerId        String?        @map("rc_reseller_id") @db.VarChar(100)
+  commissionRate      Float          @default(0) @map("commission_rate")
+  walletBalanceNpr    Float          @default(0) @map("wallet_balance_npr")
+  pricingMarkup       Float          @default(0) @map("pricing_markup")
+  status              ResellerStatus @default(PENDING_APPROVAL)
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("resellers")
+}
+
+model Backup {
+  id                  String               @id @default(uuid()) @db.Uuid
+  hostingId           String               @map("hosting_id") @db.Uuid
+  type                BackupType
+  storageProvider     BackupStorageProvider @map("storage_provider")
+  storagePath         String?              @map("storage_path") @db.VarChar(1000)
+  sizeMb              Float?               @map("size_mb")
+  status              BackupStatus         @default(IN_PROGRESS)
+  retentionUntil      DateTime?            @map("retention_until")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  completedAt         DateTime?            @map("completed_at")
+
+  hosting             HostingAccount       @relation(fields: [hostingId], references: [id], onDelete: Cascade)
+
+  @@index([hostingId])
+  @@index([status])
+  @@index([retentionUntil])
+  @@map("backups")
+}
+
+model UptimeCheck {
+  id                      String         @id @default(uuid()) @db.Uuid
+  hostingId               String         @map("hosting_id") @db.Uuid
+  domain                  String         @db.VarChar(255)
+  checkIntervalSeconds    Int            @default(300) @map("check_interval_seconds")
+  status                  UptimeStatus   @default(UP)
+  lastCheckAt             DateTime?      @map("last_check_at")
+  lastDowntimeAt          DateTime?      @map("last_downtime_at")
+  uptimePercentage        Float          @default(100) @map("uptime_percentage")
+  responseTimeMs          Int?           @map("response_time_ms")
+  createdAt               DateTime       @default(now()) @map("created_at")
+
+  hosting                 HostingAccount @relation(fields: [hostingId], references: [id], onDelete: Cascade)
+
+  @@index([hostingId])
+  @@index([status])
+  @@map("uptime_checks")
+}
+
+model ActivityLog {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String?  @map("user_id") @db.Uuid
+  action              String   @db.VarChar(100)
+  resourceType        String?  @map("resource_type") @db.VarChar(50)
+  resourceId          String?  @map("resource_id") @db.Uuid
+  ipAddress           String?  @map("ip_address") @db.VarChar(45)
+  userAgent           String?  @map("user_agent") @db.VarChar(500)
+  details             Json?
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  user                User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model Notification {
+  id                  String               @id @default(uuid()) @db.Uuid
+  userId              String               @map("user_id") @db.Uuid
+  type                NotificationType
+  category            NotificationCategory
+  title               String               @db.VarChar(255)
+  message             String               @db.Text
+  read                Boolean              @default(false)
+  sentAt              DateTime?            @map("sent_at")
+  readAt              DateTime?            @map("read_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([category])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model PromoCode {
+  id                  String       @id @default(uuid()) @db.Uuid
+  code                String       @unique @db.VarChar(50)
+  description         String?      @db.VarChar(500)
+  discountType        DiscountType @map("discount_type")
+  discountValue       Float        @map("discount_value")
+  applicableServices  Json?        @default("[]") @map("applicable_services")
+  maxUses             Int?         @map("max_uses")
+  usedCount           Int          @default(0) @map("used_count")
+  minOrderAmount      Float?       @map("min_order_amount")
+  validFrom           DateTime     @map("valid_from")
+  validUntil          DateTime     @map("valid_until")
+  status              PromoStatus  @default(ACTIVE)
+  createdAt           DateTime     @default(now()) @map("created_at")
+
+  @@index([code])
+  @@index([status])
+  @@index([validFrom, validUntil])
+  @@map("promo_codes")
+}
+
+model Saga {
+  id                  String     @id @default(uuid()) @db.Uuid
+  sagaType            String     @map("saga_type") @db.VarChar(100)
+  orderId             String?    @map("order_id") @db.Uuid
+  customerId          String?    @map("customer_id") @db.Uuid
+  currentStep         String?    @map("current_step") @db.VarChar(100)
+  status              SagaStatus @default(STARTED)
+  context             Json?      @default("{}")
+  steps               Json?      @default("[]")
+  errorMessage        String?    @map("error_message") @db.Text
+  retryCount          Int        @default(0) @map("retry_count")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  completedAt         DateTime?  @map("completed_at")
+
+  order               Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  events              SagaEvent[]
+
+  @@index([sagaType])
+  @@index([orderId])
+  @@index([status])
+  @@map("sagas")
+}
+
+model SagaEvent {
+  id                  String   @id @default(uuid()) @db.Uuid
+  sagaId              String   @map("saga_id") @db.Uuid
+  stepName            String   @map("step_name") @db.VarChar(100)
+  eventType           String   @map("event_type") @db.VarChar(50)
+  payload             Json?
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  saga                Saga     @relation(fields: [sagaId], references: [id], onDelete: Cascade)
+
+  @@index([sagaId])
+  @@index([stepName])
+  @@map("saga_events")
+}
+
+model IpPool {
+  id                  String        @id @default(uuid()) @db.Uuid
+  ipAddress           String        @unique @map("ip_address") @db.VarChar(45)
+  version             IpVersion
+  subnetId            String?       @map("subnet_id") @db.VarChar(50)
+  status              IpStatus      @default(AVAILABLE)
+  assignedTo          String?       @map("assigned_to") @db.Uuid
+  assignedType        IpAssignedType? @map("assigned_type")
+  ptrRecord           String?       @map("ptr_record") @db.VarChar(255)
+  nodeId              String?       @map("node_id") @db.VarChar(100)
+  createdAt           DateTime      @default(now()) @map("created_at")
+  allocatedAt         DateTime?     @map("allocated_at")
+  releasedAt          DateTime?     @map("released_at")
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([version])
+  @@map("ip_pool")
+}
+
+// ─── Blog Models ────────────────────────────────────────────────────────────────
+
+model BlogCategory {
+  id                  String        @id @default(uuid()) @db.Uuid
+  name                String        @db.VarChar(255)
+  slug                String        @unique @db.VarChar(255)
+  description         String?       @db.Text
+  parentId            String?       @map("parent_id") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  parent              BlogCategory? @relation("CategoryParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children            BlogCategory[] @relation("CategoryParent")
+  posts               BlogPost[]
+
+  @@index([slug])
+  @@index([parentId])
+  @@map("blog_categories")
+}
+
+model BlogTag {
+  id                  String        @id @default(uuid()) @db.Uuid
+  name                String        @db.VarChar(100)
+  slug                String        @unique @db.VarChar(100)
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  postTags            BlogPostTag[]
+
+  @@index([slug])
+  @@map("blog_tags")
+}
+
+model BlogPost {
+  id                  String          @id @default(uuid()) @db.Uuid
+  slug                String          @unique @db.VarChar(500)
+  title               String          @db.VarChar(500)
+  content             String          @db.Text
+  excerpt             String?         @db.Text
+  featuredImage       String?         @map("featured_image") @db.VarChar(500)
+  status              BlogPostStatus  @default(DRAFT)
+  publishedAt         DateTime?       @map("published_at")
+  authorId            String          @map("author_id") @db.Uuid
+  categoryId          String?         @map("category_id") @db.Uuid
+  seoTitle            String?         @map("seo_title") @db.VarChar(255)
+  seoDescription      String?         @map("seo_description") @db.VarChar(500)
+  seoKeywords         String?         @map("seo_keywords") @db.VarChar(500)
+  ogImage             String?         @map("og_image") @db.VarChar(500)
+  views               Int             @default(0)
+  readTime            Int?            @map("read_time")
+  deletedAt           DateTime?       @map("deleted_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  author              User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  category            BlogCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  postTags            BlogPostTag[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([publishedAt])
+  @@index([deletedAt])
+  @@map("blog_posts")
+}
+
+model BlogPostTag {
+  id                  String        @id @default(uuid()) @db.Uuid
+  postId              String        @map("post_id") @db.Uuid
+  tagId               String        @map("tag_id") @db.Uuid
+
+  post                BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag                 BlogTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@index([postId])
+  @@index([tagId])
+  @@map("blog_post_tags")
+}

@@ -1,0 +1,41 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            cd /root/Hosting_Nepal || exit 1
+            
+            # Pull latest code
+            git pull origin main
+            
+            # Build and restart containers
+            docker compose down --remove-orphans
+            docker compose up -d --build
+            
+            # Wait for backend health
+            echo "Waiting for services..."
+            sleep 20
+            
+            # Verify
+            curl -sf http://127.0.0.1:4001/api/v1/blog/posts > /dev/null && echo "Backend OK" || echo "Backend FAILED"
+            curl -sf http://127.0.0.1:3001 > /dev/null && echo "Frontend OK" || echo "Frontend FAILED"
+            
+            # Reload nginx to pick up any changes
+            docker exec nepse_nginx nginx -s reload 2>/dev/null || true
+            
+            echo "Deployment complete!"

@@ -1,0 +1,10 @@
+node_modules/
+.next/
+dist/
+.env
+*.log
+.DS_Store
+.claude/
+frontend-old/
+vuexy-admin-v10.11.1/
+backend/.env.production
