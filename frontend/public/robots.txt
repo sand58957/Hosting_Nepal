@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Allow: /home
+Allow: /articles
+Allow: /articles/*
+
+Disallow: /dashboard
+Disallow: /blog
+Disallow: /billing
+Disallow: /support
+Disallow: /settings
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://hostingnepals.com/sitemap.xml
