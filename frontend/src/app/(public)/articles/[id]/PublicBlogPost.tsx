@@ -91,7 +91,7 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeHeading, setActiveHeading] = useState('')
-  const [showToc, setShowToc] = useState(true)
+  const [showToc, setShowToc] = useState(typeof window !== 'undefined' ? window.innerWidth >= 900 : true)
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -177,7 +177,7 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a', overflowX: 'hidden' }}>
       {/* JSON-LD */}
       {post.jsonLd && (
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(post.jsonLd) }} />
@@ -191,10 +191,10 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
               <Logo />
               <Typography variant='h6' fontWeight={800} sx={{ color: '#fff', display: { xs: 'none', sm: 'block' } }}>Hosting Nepal</Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button size='small' sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none' }} onClick={() => router.push('/home')}>Home</Button>
-              <Button size='small' sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none' }} onClick={() => router.push('/articles')}>Blog</Button>
-              <Button size='small' variant='contained' sx={{ textTransform: 'none', borderRadius: 2, bgcolor: '#28C76F', '&:hover': { bgcolor: '#1FAF5E' } }} onClick={() => router.push('/register')}>Get Started</Button>
+            <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1 } }}>
+              <Button size='small' sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 } }} onClick={() => router.push('/home')}>Home</Button>
+              <Button size='small' sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 } }} onClick={() => router.push('/articles')}>Blog</Button>
+              <Button size='small' variant='contained' sx={{ textTransform: 'none', borderRadius: 2, bgcolor: '#28C76F', '&:hover': { bgcolor: '#1FAF5E' }, minWidth: 'auto', px: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.75rem', sm: '0.8125rem' } }} onClick={() => router.push('/register')}>Get Started</Button>
             </Box>
           </Box>
         </Container>
@@ -355,9 +355,10 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
             </Card>
           </Grid>
 
-          {/* Sidebar — hidden on mobile, sticky on desktop */}
-          <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: 'none', md: 'block' } }}>
-            <Box sx={{ position: 'sticky', top: 72 }}>
+          {/* Sidebar — below content on mobile, sticky on desktop */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Divider sx={{ display: { xs: 'block', md: 'none' }, borderColor: 'rgba(255,255,255,0.06)', my: 2 }} />
+            <Box sx={{ position: { xs: 'static', md: 'sticky' }, top: 72 }}>
               {/* Table of Contents */}
               {headings.length > 3 && (
                 <Card sx={{ mb: 3, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3 }}>

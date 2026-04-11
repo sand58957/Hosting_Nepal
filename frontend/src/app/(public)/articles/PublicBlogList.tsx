@@ -50,18 +50,18 @@ const PublicBlogList = () => {
   useEffect(() => { fetchPosts() }, [fetchPosts])
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a', overflowX: 'hidden' }}>
       {/* Header */}
       <Box sx={{ bgcolor: 'rgba(15,15,26,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)', py: 1.5 }}>
         <Container maxWidth='lg'>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }} onClick={() => router.push('/home')}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, cursor: 'pointer', minWidth: 0 }} onClick={() => router.push('/home')}>
               <Logo />
-              <Typography variant='h6' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
+              <Typography variant='h6' fontWeight={800} sx={{ color: '#fff', display: { xs: 'none', sm: 'block' } }}>Hosting Nepal</Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Button size='small' sx={{ color: '#fff', textTransform: 'none' }} onClick={() => router.push('/home')}>Home</Button>
-              <Button size='small' variant='contained' sx={{ textTransform: 'none', borderRadius: 2 }} onClick={() => router.push('/login')}>Sign In</Button>
+            <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1.5 } }}>
+              <Button size='small' sx={{ color: '#fff', textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 } }} onClick={() => router.push('/home')}>Home</Button>
+              <Button size='small' variant='contained' sx={{ textTransform: 'none', borderRadius: 2, minWidth: 'auto', px: { xs: 1.5, sm: 2 } }} onClick={() => router.push('/login')}>Sign In</Button>
             </Box>
           </Box>
         </Container>
