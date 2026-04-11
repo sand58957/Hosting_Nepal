@@ -23,6 +23,8 @@ import Alert from '@mui/material/Alert'
 import IconButton from '@mui/material/IconButton'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
+import Avatar from '@mui/material/Avatar'
+import LinearProgress from '@mui/material/LinearProgress'
 
 import CustomTextField from '@core/components/mui/TextField'
 import api from '@/lib/api'
@@ -39,6 +41,21 @@ interface BlogPost {
   author: { id: string; name: string }
   category: { id: string; name: string; slug: string } | null
   tags: { id: string; name: string }[]
+}
+
+interface Analytics {
+  overview: {
+    totalPosts: number
+    publishedPosts: number
+    draftPosts: number
+    scheduledPosts: number
+    archivedPosts: number
+    totalViews: number
+    avgViews: number
+  }
+  topPosts: { id: string; title: string; slug: string; views: number; publishedAt: string; readTime: number | null }[]
+  categoryStats: { id: string; name: string; slug: string; postCount: number }[]
+  recentPosts: { id: string; title: string; status: string; views: number; createdAt: string; publishedAt: string | null }[]
 }
 
 const statusColors: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
@@ -61,6 +78,19 @@ const BlogPostsPage = () => {
   const [search, setSearch] = useState('')
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const res = await api.get('/blog/posts/analytics')
+        setAnalytics(res.data?.data ?? res.data)
+      } catch {} finally { setAnalyticsLoading(false) }
+    }
+
+    fetchAnalytics()
+  }, [])
 
   const fetchPosts = useCallback(async () => {
     setLoading(true)
@@ -109,10 +139,151 @@ const BlogPostsPage = () => {
     }
   }
 
+  const statCards = analytics ? [
+    { label: 'Total Posts', value: analytics.overview.totalPosts, icon: 'tabler-article', color: '#7367F0', bg: 'rgba(115,103,240,0.12)' },
+    { label: 'Published', value: analytics.overview.publishedPosts, icon: 'tabler-check', color: '#28C76F', bg: 'rgba(40,199,111,0.12)' },
+    { label: 'Total Views', value: analytics.overview.totalViews.toLocaleString(), icon: 'tabler-eye', color: '#00CFE8', bg: 'rgba(0,207,232,0.12)' },
+    { label: 'Avg Views/Post', value: analytics.overview.avgViews.toLocaleString(), icon: 'tabler-chart-bar', color: '#FF9F43', bg: 'rgba(255,159,67,0.12)' },
+  ] : []
+
   return (
     <Grid container spacing={6}>
       {successMsg && <Grid size={{ xs: 12 }}><Alert severity='success' onClose={() => setSuccessMsg(null)}>{successMsg}</Alert></Grid>}
       {errorMsg && <Grid size={{ xs: 12 }}><Alert severity='error' onClose={() => setErrorMsg(null)}>{errorMsg}</Alert></Grid>}
+
+      {/* Analytics Overview Cards */}
+      {analyticsLoading ? (
+        <>
+          {[...Array(4)].map((_, i) => (
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={i}>
+              <Card><CardContent><Skeleton height={80} /></CardContent></Card>
+            </Grid>
+          ))}
+        </>
+      ) : analytics && (
+        <>
+          {statCards.map(stat => (
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={stat.label}>
+              <Card>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 3, py: '1.25rem !important' }}>
+                  <Avatar sx={{ width: 48, height: 48, bgcolor: stat.bg, color: stat.color }}>
+                    <i className={stat.icon} style={{ fontSize: 24 }} />
+                  </Avatar>
+                  <Box>
+                    <Typography variant='h5' fontWeight={700}>{stat.value}</Typography>
+                    <Typography variant='body2' color='text.secondary'>{stat.label}</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+
+          {/* Top Posts & Category Breakdown */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Card>
+              <CardHeader title='Top Performing Posts' titleTypographyProps={{ variant: 'h6' }} />
+              <CardContent sx={{ pt: 0 }}>
+                {analytics.topPosts.length === 0 ? (
+                  <Typography variant='body2' color='text.secondary'>No published posts yet</Typography>
+                ) : (
+                  <TableContainer>
+                    <Table size='small'>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Post</TableCell>
+                          <TableCell align='right'>Views</TableCell>
+                          <TableCell align='right'>Read Time</TableCell>
+                          <TableCell align='right'>Published</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {analytics.topPosts.map((post, idx) => (
+                          <TableRow key={post.id} hover sx={{ cursor: 'pointer' }} onClick={() => router.push(`/blog/${post.id}/edit`)}>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: idx === 0 ? '#FF9F43' : idx === 1 ? '#7367F0' : idx === 2 ? '#28C76F' : 'action.selected' }}>
+                                  {idx + 1}
+                                </Avatar>
+                                <Typography variant='body2' fontWeight={500} sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {post.title}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell align='right'>
+                              <Typography variant='body2' fontWeight={600}>{post.views.toLocaleString()}</Typography>
+                            </TableCell>
+                            <TableCell align='right'>
+                              <Typography variant='body2' color='text.secondary'>{post.readTime ? `${post.readTime} min` : '-'}</Typography>
+                            </TableCell>
+                            <TableCell align='right'>
+                              <Typography variant='caption' color='text.secondary'>
+                                {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ height: '100%' }}>
+              <CardHeader title='Posts by Category' titleTypographyProps={{ variant: 'h6' }} />
+              <CardContent sx={{ pt: 0 }}>
+                {analytics.categoryStats.length === 0 ? (
+                  <Typography variant='body2' color='text.secondary'>No categories yet</Typography>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                    {analytics.categoryStats
+                      .sort((a, b) => b.postCount - a.postCount)
+                      .map(cat => {
+                        const maxCount = Math.max(...analytics.categoryStats.map(c => c.postCount), 1)
+
+                        return (
+                          <Box key={cat.id}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant='body2' fontWeight={500}>{cat.name}</Typography>
+                              <Typography variant='body2' color='text.secondary'>{cat.postCount} posts</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant='determinate'
+                              value={(cat.postCount / maxCount) * 100}
+                              sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover',
+                                '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: '#7367F0' } }}
+                            />
+                          </Box>
+                        )
+                      })}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Post Status Breakdown */}
+          <Grid size={{ xs: 12 }}>
+            <Card>
+              <CardContent sx={{ display: 'flex', justifyContent: 'center', gap: { xs: 3, md: 6 }, flexWrap: 'wrap', py: '1.25rem !important' }}>
+                {[
+                  { label: 'Drafts', value: analytics.overview.draftPosts, color: '#A8AAAE' },
+                  { label: 'Published', value: analytics.overview.publishedPosts, color: '#28C76F' },
+                  { label: 'Scheduled', value: analytics.overview.scheduledPosts, color: '#00CFE8' },
+                  { label: 'Archived', value: analytics.overview.archivedPosts, color: '#FF9F43' },
+                ].map(s => (
+                  <Box key={s.label} sx={{ textAlign: 'center', minWidth: 80 }}>
+                    <Typography variant='h5' fontWeight={700} sx={{ color: s.color }}>{s.value}</Typography>
+                    <Typography variant='caption' color='text.secondary'>{s.label}</Typography>
+                  </Box>
+                ))}
+              </CardContent>
+            </Card>
+          </Grid>
+        </>
+      )}
 
       <Grid size={{ xs: 12 }}>
         <Card>

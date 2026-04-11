@@ -39,6 +39,15 @@ export class BlogPostController {
     return this.blogPostService.findAll(query, true);
   }
 
+  @Get('analytics')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get blog analytics overview' })
+  async getAnalytics() {
+    return this.blogPostService.getAnalytics();
+  }
+
   @Get(':slug')
   @ApiOperation({ summary: 'Get a single blog post by slug' })
   async findBySlug(@Param('slug') slug: string) {

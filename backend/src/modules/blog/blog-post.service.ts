@@ -219,4 +219,55 @@ export class BlogPostService {
       orderBy: { publishedAt: 'desc' },
     });
   }
+
+  async getAnalytics() {
+    const where = { deletedAt: null };
+
+    const [
+      totalPosts,
+      publishedPosts,
+      draftPosts,
+      scheduledPosts,
+      archivedPosts,
+      totalViewsResult,
+      topPosts,
+      categoryStats,
+      recentPosts,
+    ] = await Promise.all([
+      this.prisma.blogPost.count({ where }),
+      this.prisma.blogPost.count({ where: { ...where, status: BlogPostStatus.PUBLISHED } }),
+      this.prisma.blogPost.count({ where: { ...where, status: BlogPostStatus.DRAFT } }),
+      this.prisma.blogPost.count({ where: { ...where, status: BlogPostStatus.SCHEDULED } }),
+      this.prisma.blogPost.count({ where: { ...where, status: BlogPostStatus.ARCHIVED } }),
+      this.prisma.blogPost.aggregate({ where, _sum: { views: true } }),
+      this.prisma.blogPost.findMany({
+        where: { ...where, status: BlogPostStatus.PUBLISHED },
+        orderBy: { views: 'desc' },
+        take: 5,
+        select: { id: true, title: true, slug: true, views: true, publishedAt: true, readTime: true },
+      }),
+      this.prisma.blogCategory.findMany({
+        select: {
+          id: true, name: true, slug: true,
+          posts: { where, select: { id: true } },
+        },
+      }),
+      this.prisma.blogPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, title: true, status: true, views: true, createdAt: true, publishedAt: true },
+      }),
+    ]);
+
+    const totalViews = totalViewsResult._sum.views || 0;
+    const avgViews = publishedPosts > 0 ? Math.round(totalViews / publishedPosts) : 0;
+
+    return {
+      overview: { totalPosts, publishedPosts, draftPosts, scheduledPosts, archivedPosts, totalViews, avgViews },
+      topPosts,
+      categoryStats: categoryStats.map(c => ({ id: c.id, name: c.name, slug: c.slug, postCount: c.posts.length })),
+      recentPosts,
+    };
+  }
 }
