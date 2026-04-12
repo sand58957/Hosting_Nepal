@@ -23,6 +23,7 @@ import Alert from '@mui/material/Alert'
 import InputAdornment from '@mui/material/InputAdornment'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
+import Drawer from '@mui/material/Drawer'
 
 import CustomTextField from '@core/components/mui/TextField'
 import Logo from '@core/svg/Logo'
@@ -305,39 +306,223 @@ const HomePage = () => {
         .fade-up.visible .fade-up-child:nth-child(6) { opacity:1 !important; transform:translateY(0) !important; transition-delay:0.5s; }
       ` }} />
 
-      {/* ════════════════════════ NAVBAR ════════════════════════ */}
-      <Box sx={{
-        position: 'sticky', top: 0, zIndex: 1100,
-        bgcolor: 'rgba(15,15,26,0.9)', backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)'
-      }}>
-        <Container maxWidth='lg'>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 64 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }} onClick={() => scrollTo('hero')}>
-              <Logo />
-              <Typography variant='h6' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
+      {/* ════════════════════════ MEGA NAVBAR ════════════════════════ */}
+      {(() => {
+        const navMenus = [
+          {
+            label: 'Hosting', items: [
+              { icon: 'tabler-brand-wordpress', title: 'WordPress Hosting', desc: 'Managed WP with LiteSpeed & CyberPanel', link: '/hosting/plans' },
+              { icon: 'tabler-server', title: 'VPS Hosting', desc: 'Full root access, NVMe SSD, scalable', link: '/vps/order' },
+              { icon: 'tabler-server-cog', title: 'VDS Hosting', desc: 'Dedicated CPU & RAM, enterprise grade', link: '/vps/vds/order' },
+              { icon: 'tabler-database', title: 'Dedicated Server', desc: 'Bare metal, Intel Xeon, max performance', link: '/vps/dedicated/order' },
+            ]
+          },
+          {
+            label: 'Domains', items: [
+              { icon: 'tabler-world', title: 'Register Domain', desc: '.com, .np, .com.np from NPR 1,200', link: '/domains/search' },
+              { icon: 'tabler-transfer', title: 'Transfer Domain', desc: 'Move your domain with free extension', link: '/domains/transfers' },
+              { icon: 'tabler-dns', title: 'DNS Management', desc: 'Advanced DNS with full record support', link: '/domains/dns' },
+              { icon: 'tabler-shield-lock', title: 'WHOIS Privacy', desc: 'Protect your identity for free', link: '/domains' },
+            ]
+          },
+          {
+            label: 'Email', items: [
+              { icon: 'tabler-mail', title: 'Business Email', desc: 'Professional email with your domain', link: '/email' },
+              { icon: 'tabler-brand-google', title: 'Google Workspace', desc: 'Gmail, Drive, Meet for teams', link: '/email/google-workspace' },
+              { icon: 'tabler-mail-cog', title: 'Titan Email', desc: 'Built for business communication', link: '/email/titan' },
+            ]
+          },
+          {
+            label: 'Security', items: [
+              { icon: 'tabler-lock', title: 'SSL Certificates', desc: 'Free & premium SSL for every site', link: '/ssl' },
+              { icon: 'tabler-shield-check', title: 'DDoS Protection', desc: 'Always-on attack mitigation', link: '/vps' },
+              { icon: 'tabler-scan', title: 'Malware Scanner', desc: 'Auto-detect & remove threats', link: '/hosting/security/scanner' },
+            ]
+          },
+        ]
+
+        const [activeMenu, setActiveMenu] = useState<string | null>(null)
+        const [mobileOpen, setMobileOpen] = useState(false)
+        const [mobileExpanded, setMobileExpanded] = useState<string | null>(null)
+        const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+        const handleEnter = (label: string) => {
+          if (navTimeout.current) clearTimeout(navTimeout.current)
+          setActiveMenu(label)
+        }
+        const handleLeave = () => {
+          navTimeout.current = setTimeout(() => setActiveMenu(null), 200)
+        }
+
+        return (
+          <>
+            <Box sx={{
+              position: 'sticky', top: 0, zIndex: 1100,
+              bgcolor: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <Container maxWidth='lg'>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 64 }}>
+                  {/* Logo */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', minWidth: 0 }} onClick={() => scrollTo('hero')}>
+                    <Logo />
+                    <Typography variant='h6' fontWeight={800} sx={{ color: '#fff', whiteSpace: 'nowrap' }}>Hosting Nepal</Typography>
+                  </Box>
+
+                  {/* Desktop Nav */}
+                  <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 0.5, alignItems: 'center' }}>
+                    {navMenus.map(menu => (
+                      <Box key={menu.label} onMouseEnter={() => handleEnter(menu.label)} onMouseLeave={handleLeave}
+                        sx={{ position: 'relative' }}>
+                        <Button size='small' endIcon={<i className='tabler-chevron-down' style={{ fontSize: 14, transition: '0.2s', transform: activeMenu === menu.label ? 'rotate(180deg)' : 'none' }} />}
+                          sx={{
+                            color: activeMenu === menu.label ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none',
+                            borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+                          }}>
+                          {menu.label}
+                        </Button>
+
+                        {/* Dropdown Mega Menu */}
+                        <Box onMouseEnter={() => handleEnter(menu.label)} onMouseLeave={handleLeave}
+                          sx={{
+                            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+                            pt: 1, opacity: activeMenu === menu.label ? 1 : 0,
+                            pointerEvents: activeMenu === menu.label ? 'auto' : 'none',
+                            transition: 'opacity 0.2s ease, transform 0.2s ease',
+                          }}>
+                          <Paper elevation={0} sx={{
+                            bgcolor: 'rgba(20,20,38,0.98)', backdropFilter: 'blur(24px)',
+                            border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3,
+                            p: 1.5, minWidth: 320, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                          }}>
+                            {menu.items.map(item => (
+                              <Box key={item.title} onClick={() => { router.push(item.link); setActiveMenu(null) }}
+                                sx={{
+                                  display: 'flex', gap: 2, p: 1.5, borderRadius: 2, cursor: 'pointer',
+                                  transition: '0.2s', '&:hover': { bgcolor: 'rgba(115,103,240,0.08)' },
+                                }}>
+                                <Box sx={{
+                                  width: 40, height: 40, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  bgcolor: 'rgba(115,103,240,0.1)', color: '#7367F0', flexShrink: 0,
+                                }}>
+                                  <i className={item.icon} style={{ fontSize: 20 }} />
+                                </Box>
+                                <Box>
+                                  <Typography variant='body2' fontWeight={600} sx={{ color: '#fff', lineHeight: 1.4 }}>{item.title}</Typography>
+                                  <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 }}>{item.desc}</Typography>
+                                </Box>
+                              </Box>
+                            ))}
+                          </Paper>
+                        </Box>
+                      </Box>
+                    ))}
+
+                    {/* Direct links */}
+                    <Button size='small' onClick={() => router.push('/articles')}
+                      sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
+                      Blog
+                    </Button>
+                    <Button size='small' onClick={() => scrollTo('faq')}
+                      sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
+                      FAQ
+                    </Button>
+                  </Box>
+
+                  {/* Right Actions */}
+                  <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1.5 }, alignItems: 'center' }}>
+                    <Button size='small' onClick={() => router.push('/login')}
+                      sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600, textTransform: 'none', display: { xs: 'none', sm: 'inline-flex' } }}>
+                      Sign In
+                    </Button>
+                    <Button variant='contained' size='small' disableElevation onClick={() => router.push('/register')}
+                      sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, px: { xs: 2, sm: 3 }, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
+                      Get Started
+                    </Button>
+                    {/* Mobile Menu Button */}
+                    <IconButton onClick={() => setMobileOpen(true)} sx={{ display: { xs: 'flex', lg: 'none' }, color: '#fff', ml: 0.5 }}>
+                      <i className='tabler-menu-2' style={{ fontSize: 22 }} />
+                    </IconButton>
+                  </Box>
+                </Box>
+              </Container>
             </Box>
-            <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 0.5 }}>
-              {[{ label: 'Domains', id: 'domains' }, { label: 'Hosting', id: 'pricing' }, { label: 'Features', id: 'features' }, { label: 'FAQ', id: 'faq' }].map(item => (
-                <Button key={item.id} size='small' onClick={() => scrollTo(item.id)}
-                  sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
-                  {item.label}
+
+            {/* Mobile Drawer */}
+            <Drawer anchor='right' open={mobileOpen} onClose={() => setMobileOpen(false)}
+              PaperProps={{ sx: { bgcolor: '#0f0f1a', width: 300, p: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' } }}>
+              <Box sx={{ p: 2.5 }}>
+                {/* Drawer Header */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Logo />
+                    <Typography variant='body1' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
+                  </Box>
+                  <IconButton onClick={() => setMobileOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <i className='tabler-x' style={{ fontSize: 20 }} />
+                  </IconButton>
+                </Box>
+
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 2 }} />
+
+                {/* Mobile Menu Items */}
+                {navMenus.map(menu => (
+                  <Box key={menu.label} sx={{ mb: 0.5 }}>
+                    <Button fullWidth onClick={() => setMobileExpanded(mobileExpanded === menu.label ? null : menu.label)}
+                      endIcon={<i className={mobileExpanded === menu.label ? 'tabler-chevron-up' : 'tabler-chevron-down'} style={{ fontSize: 14 }} />}
+                      sx={{
+                        justifyContent: 'space-between', color: mobileExpanded === menu.label ? '#fff' : 'rgba(255,255,255,0.7)',
+                        textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2,
+                        bgcolor: mobileExpanded === menu.label ? 'rgba(115,103,240,0.08)' : 'transparent',
+                      }}>
+                      {menu.label}
+                    </Button>
+                    {mobileExpanded === menu.label && (
+                      <Box sx={{ pl: 1, pb: 1 }}>
+                        {menu.items.map(item => (
+                          <Box key={item.title} onClick={() => { router.push(item.link); setMobileOpen(false) }}
+                            sx={{
+                              display: 'flex', gap: 1.5, p: 1.2, borderRadius: 2, cursor: 'pointer',
+                              transition: '0.15s', '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' },
+                            }}>
+                            <i className={item.icon} style={{ fontSize: 18, color: '#7367F0', marginTop: 2 }} />
+                            <Box>
+                              <Typography variant='body2' fontWeight={500} sx={{ color: '#fff', fontSize: '0.85rem' }}>{item.title}</Typography>
+                              <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem' }}>{item.desc}</Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
+
+                <Button fullWidth onClick={() => { router.push('/articles'); setMobileOpen(false) }}
+                  sx={{ justifyContent: 'flex-start', color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2 }}>
+                  <i className='tabler-article' style={{ fontSize: 18, marginRight: 10 }} /> Blog
                 </Button>
-              ))}
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-              <Button size='small' onClick={() => router.push('/login')}
-                sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600, textTransform: 'none' }}>
-                Sign In
-              </Button>
-              <Button variant='contained' size='small' disableElevation onClick={() => router.push('/register')}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, px: 3, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
-                Get Started
-              </Button>
-            </Box>
-          </Box>
-        </Container>
-      </Box>
+                <Button fullWidth onClick={() => { scrollTo('faq'); setMobileOpen(false) }}
+                  sx={{ justifyContent: 'flex-start', color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2 }}>
+                  <i className='tabler-help-circle' style={{ fontSize: 18, marginRight: 10 }} /> FAQ
+                </Button>
+
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
+
+                <Button fullWidth variant='outlined' onClick={() => { router.push('/login'); setMobileOpen(false) }}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, mb: 1.5, color: '#fff', borderColor: 'rgba(255,255,255,0.15)', '&:hover': { borderColor: 'rgba(255,255,255,0.3)' } }}>
+                  Sign In
+                </Button>
+                <Button fullWidth variant='contained' disableElevation onClick={() => { router.push('/register'); setMobileOpen(false) }}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
+                  Get Started
+                </Button>
+              </Box>
+            </Drawer>
+          </>
+        )
+      })()}
 
       {/* ════════════════════════ HERO — Dark + Floating Pills ════════════════════════ */}
       <Box id='hero' className='hero-gradient' sx={{
