@@ -1395,14 +1395,31 @@ const HomePage = () => {
             </Grid>
             <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <Typography variant='subtitle2' fontWeight={700} sx={{ mb: 2.5, color: '#fff' }}>Products</Typography>
-              {['WordPress Hosting', 'VPS Servers', 'Dedicated Servers', 'Domain Names', 'SSL Certificates'].map(l => (
-                <Typography key={l} variant='body2' sx={{ color: '#fff', mb: 1.2, cursor: 'pointer', '&:hover': { color: '#28C76F' }, lineHeight: 1.6 }}>{l}</Typography>
+              {[
+                { label: 'WordPress Hosting', link: '/hosting/plans' },
+                { label: 'VPS Servers', link: '/vps/order' },
+                { label: 'VDS Servers', link: '/vps/vds/order' },
+                { label: 'Dedicated Servers', link: '/vps/dedicated/order' },
+                { label: 'Domain Names', link: '/domains/search' },
+                { label: 'Business Email', link: '/email' },
+                { label: 'SSL Certificates', link: '/ssl' },
+              ].map(l => (
+                <Typography key={l.label} variant='body2' onClick={() => router.push(l.link)}
+                  sx={{ color: '#fff', mb: 1.2, cursor: 'pointer', '&:hover': { color: '#28C76F' }, lineHeight: 1.6 }}>{l.label}</Typography>
               ))}
             </Grid>
             <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <Typography variant='subtitle2' fontWeight={700} sx={{ mb: 2.5, color: '#fff' }}>Company</Typography>
-              {['About Us', 'Contact', 'Support Center', 'Blog', 'Terms of Service', 'Privacy Policy'].map(l => (
-                <Typography key={l} variant='body2' sx={{ color: '#fff', mb: 1.2, cursor: 'pointer', '&:hover': { color: '#28C76F' }, lineHeight: 1.6 }}>{l}</Typography>
+              {[
+                { label: 'About Us', link: '/about' },
+                { label: 'Contact', link: '/contact' },
+                { label: 'Support Center', link: '/support' },
+                { label: 'Blog', link: '/articles' },
+                { label: 'Terms of Service', link: '/terms' },
+                { label: 'Privacy Policy', link: '/privacy' },
+              ].map(l => (
+                <Typography key={l.label} variant='body2' onClick={() => router.push(l.link)}
+                  sx={{ color: '#fff', mb: 1.2, cursor: 'pointer', '&:hover': { color: '#28C76F' }, lineHeight: 1.6 }}>{l.label}</Typography>
               ))}
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -1413,7 +1430,11 @@ const HomePage = () => {
                 ))}
               </Box>
               <Typography variant='subtitle2' fontWeight={700} sx={{ mb: 1.5, color: '#fff' }}>Contact</Typography>
-              <Typography variant='body2' sx={{ color: '#fff', lineHeight: 1.8 }}>Kathmandu, Nepal<br />support@hostingnepal.com</Typography>
+              <Typography variant='body2' sx={{ color: '#fff', lineHeight: 1.8 }}>
+                Koteshwor, Kathmandu, Nepal<br />
+                admin@hostingnepals.com<br />
+                +977-9802348957
+              </Typography>
             </Grid>
           </Grid>
           <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
