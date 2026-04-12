@@ -667,6 +667,11 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
         label: 'Settings',
         href: '/settings',
         icon: 'tabler-settings'
+      },
+      {
+        label: 'User Management',
+        href: '/users',
+        icon: 'tabler-users-group'
       }
     ]
   }

@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../database/prisma.service';
 import {
+  UserRole,
   UserStatus,
   OrderStatus,
   PaymentStatus,
@@ -319,6 +320,61 @@ export class AdminService {
       `User ${id} status updated to ${dto.status}${dto.reason ? ` — reason: ${dto.reason}` : ''}`,
     );
     return updated;
+  }
+
+  async updateUserRole(id: string, role: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    if (!user) throw new NotFoundException(`User with id "${id}" not found`);
+
+    const validRoles = Object.values(UserRole);
+    if (!validRoles.includes(role as UserRole)) {
+      throw new BadRequestException(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { role: role as UserRole },
+      select: { id: true, email: true, name: true, role: true, updatedAt: true },
+    });
+
+    this.logger.log(`User ${id} role updated to ${role}`);
+    return updated;
+  }
+
+  async getUserAnalytics() {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalUsers,
+      activeUsers,
+      suspendedUsers,
+      newUsersThisMonth,
+      newUsersThisWeek,
+      roleBreakdown,
+      recentUsers,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
+      this.prisma.user.count({ where: { status: UserStatus.SUSPENDED } }),
+      this.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      this.prisma.user.groupBy({ by: ['role'], _count: { role: true } }),
+      this.prisma.user.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { id: true, name: true, email: true, role: true, status: true, createdAt: true, lastLoginAt: true },
+      }),
+    ]);
+
+    const roles = roleBreakdown.reduce((acc, r) => ({ ...acc, [r.role]: r._count.role }), {} as Record<string, number>);
+
+    return {
+      overview: { totalUsers, activeUsers, suspendedUsers, newUsersThisMonth, newUsersThisWeek },
+      roles,
+      recentUsers,
+    };
   }
 
   // ─── Orders ─────────────────────────────────────────────────────────────────

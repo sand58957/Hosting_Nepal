@@ -89,6 +89,24 @@ export class AdminController {
     return this.adminService.updateUserStatus(id, dto);
   }
 
+  @Patch('users/:id/role')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update user role' })
+  @ApiParam({ name: 'id', description: 'User UUID' })
+  async updateUserRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { role: string },
+  ) {
+    this.logger.log(`Admin updating user ${id} role to ${body.role}`);
+    return this.adminService.updateUserRole(id, body.role);
+  }
+
+  @Get('users-analytics')
+  @ApiOperation({ summary: 'Get user analytics overview' })
+  async getUserAnalytics() {
+    return this.adminService.getUserAnalytics();
+  }
+
   // ─── Orders ─────────────────────────────────────────────────────────────────
 
   @Get('orders')
