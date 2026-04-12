@@ -890,4 +890,32 @@ export class AdminService {
     this.logger.log('Site config updated');
     return updated;
   }
+
+  private readonly subscribersPath = path.join(process.cwd(), 'subscribers.json');
+
+  async addSubscriber(email: string) {
+    let subscribers: string[] = [];
+    try {
+      if (fs.existsSync(this.subscribersPath)) {
+        subscribers = JSON.parse(fs.readFileSync(this.subscribersPath, 'utf-8'));
+      }
+    } catch {}
+
+    if (!subscribers.includes(email)) {
+      subscribers.push(email);
+      fs.writeFileSync(this.subscribersPath, JSON.stringify(subscribers, null, 2));
+      this.logger.log(`New subscriber: ${email}`);
+    }
+
+    return { total: subscribers.length };
+  }
+
+  async getSubscribers() {
+    try {
+      if (fs.existsSync(this.subscribersPath)) {
+        return JSON.parse(fs.readFileSync(this.subscribersPath, 'utf-8'));
+      }
+    } catch {}
+    return [];
+  }
 }

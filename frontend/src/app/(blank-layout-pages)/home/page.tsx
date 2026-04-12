@@ -173,6 +173,9 @@ const HomePage = () => {
   const [domainPrices, setDomainPrices] = useState<DomainPrice[]>([])
   const [blogPosts, setBlogPosts] = useState<any[]>([])
   const [pricingTab, setPricingTab] = useState(0)
+  const [subEmail, setSubEmail] = useState('')
+  const [subLoading, setSubLoading] = useState(false)
+  const [subMsg, setSubMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [domainQuery, setDomainQuery] = useState('')
   const [domainResults, setDomainResults] = useState<DomainResult[]>([])
   const [searching, setSearching] = useState(false)
@@ -1360,6 +1363,49 @@ const HomePage = () => {
         </Container>
       </Box>
       
+
+      {/* ════════════════════════ NEWSLETTER ════════════════════════ */}
+      <Box sx={{ bgcolor: 'rgba(115,103,240,0.04)', py: { xs: 5, md: 7 }, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <Container maxWidth='sm'>
+          <Box sx={{ textAlign: 'center' }}>
+            <i className='tabler-mail-star' style={{ fontSize: 40, color: '#7367F0', marginBottom: 12 }} />
+            <Typography variant='h5' fontWeight={700} sx={{ color: '#fff', mb: 1 }}>Stay Updated</Typography>
+            <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.45)', mb: 3 }}>
+              Subscribe to our newsletter for hosting tips, deals, and Nepal tech insights.
+            </Typography>
+            {subMsg && (
+              <Alert severity={subMsg.type} onClose={() => setSubMsg(null)} sx={{ mb: 2, textAlign: 'left' }}>
+                {subMsg.text}
+              </Alert>
+            )}
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <CustomTextField
+                fullWidth placeholder='Enter your email address' size='small'
+                value={subEmail} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSubEmail(e.target.value)}
+                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') document.getElementById('sub-btn')?.click() }}
+                sx={{ '& .MuiInputBase-root': { bgcolor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)' }, '& input': { color: '#fff' } }}
+              />
+              <Button id='sub-btn' variant='contained' disableElevation disabled={subLoading}
+                onClick={async () => {
+                  if (!subEmail || !subEmail.includes('@')) { setSubMsg({ type: 'error', text: 'Please enter a valid email' }); return }
+                  setSubLoading(true); setSubMsg(null)
+                  try {
+                    await api.post('/site-config/subscribe', { email: subEmail })
+                    setSubMsg({ type: 'success', text: 'Subscribed! Check your inbox for a welcome email.' })
+                    setSubEmail('')
+                  } catch { setSubMsg({ type: 'error', text: 'Failed to subscribe. Try again.' }) }
+                  finally { setSubLoading(false) }
+                }}
+                sx={{ bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' }, textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 3, whiteSpace: 'nowrap' }}>
+                {subLoading ? 'Subscribing...' : 'Subscribe'}
+              </Button>
+            </Box>
+            <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.25)', mt: 1.5, display: 'block' }}>
+              No spam, ever. Unsubscribe anytime.
+            </Typography>
+          </Box>
+        </Container>
+      </Box>
 
       {/* ════════════════════════ FOOTER ════════════════════════ */}
       <Box sx={{ bgcolor: '#0f0f1a', color: '#fff', py: { xs: 6, md: 8 } }}>
