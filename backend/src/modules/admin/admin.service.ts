@@ -4,6 +4,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from '../../database/prisma.service';
 import {
   UserStatus,
@@ -801,5 +803,35 @@ export class AdminService {
       `Broadcast notification sent to ${result.count} users: [${category}] ${title}`,
     );
     return { created: result.count };
+  }
+
+  // ─── Site Config (file-based) ──────────────────────────────────────────────
+
+  private readonly configPath = path.join(process.cwd(), 'site-config.json');
+
+  private readonly defaultConfig = {
+    whatsappNumber: '9779802348957',
+    whatsappMessage: 'Hello Hosting Nepal! I need help with your hosting services.',
+    whatsappEnabled: true,
+  };
+
+  async getSiteConfig() {
+    try {
+      if (fs.existsSync(this.configPath)) {
+        const data = fs.readFileSync(this.configPath, 'utf-8');
+        return { ...this.defaultConfig, ...JSON.parse(data) };
+      }
+    } catch (e) {
+      this.logger.warn('Failed to read site config, using defaults');
+    }
+    return this.defaultConfig;
+  }
+
+  async updateSiteConfig(config: Record<string, any>) {
+    const current = await this.getSiteConfig();
+    const updated = { ...current, ...config };
+    fs.writeFileSync(this.configPath, JSON.stringify(updated, null, 2));
+    this.logger.log('Site config updated');
+    return updated;
   }
 }

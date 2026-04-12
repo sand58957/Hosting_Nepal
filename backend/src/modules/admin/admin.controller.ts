@@ -250,4 +250,20 @@ export class AdminController {
     this.logger.log(`Admin broadcasting notification: [${dto.category}] ${dto.title}`);
     return this.adminService.broadcastNotification(dto.title, dto.message, dto.category);
   }
+
+  // ─── Site Config ────────────────────────────────────────────────────────────
+
+  @Get('site-config')
+  @ApiOperation({ summary: 'Get site configuration (WhatsApp number, etc.)' })
+  async getSiteConfig() {
+    return this.adminService.getSiteConfig();
+  }
+
+  @Patch('site-config')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update site configuration' })
+  async updateSiteConfig(@Body() config: Record<string, any>) {
+    this.logger.log('Admin updating site config');
+    return this.adminService.updateSiteConfig(config);
+  }
 }

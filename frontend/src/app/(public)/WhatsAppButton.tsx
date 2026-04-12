@@ -1,10 +1,25 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Box from '@mui/material/Box'
 
-const WhatsAppButton = () => (
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001/api/v1'
+
+const WhatsAppButton = () => {
+  const [config, setConfig] = useState({ whatsappNumber: '9779802348957', whatsappMessage: 'Hello Hosting Nepal! I need help with your hosting services.', whatsappEnabled: true })
+
+  useEffect(() => {
+    fetch(`${API_URL}/site-config`).then(r => r.json()).then(d => {
+      const data = d?.data ?? d
+      if (data?.whatsappNumber) setConfig(data)
+    }).catch(() => {})
+  }, [])
+
+  if (!config.whatsappEnabled) return null
+
+  return (
   <Box
-    onClick={() => window.open('https://wa.me/9779802348957?text=Hello%20Hosting%20Nepal!%20I%20need%20help%20with%20your%20hosting%20services.', '_blank')}
+    onClick={() => window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(config.whatsappMessage)}`, '_blank')}
     sx={{
       position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 1200,
       width: 60, height: 60, borderRadius: '50%',
@@ -26,6 +41,7 @@ const WhatsAppButton = () => (
   >
     <i className='tabler-brand-whatsapp' style={{ fontSize: 32, position: 'relative', zIndex: 1 }} />
   </Box>
-)
+  )
+}
 
 export default WhatsAppButton

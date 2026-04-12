@@ -48,6 +48,13 @@ const SettingsPage = () => {
   const [billingAlerts, setBillingAlerts] = useState(true)
   const [domainExpiry, setDomainExpiry] = useState(true)
   const [marketingEmails, setMarketingEmails] = useState(false)
+
+  // Site Config (admin only)
+  const [whatsappNumber, setWhatsappNumber] = useState('9779802348957')
+  const [whatsappMessage, setWhatsappMessage] = useState('Hello Hosting Nepal! I need help with your hosting services.')
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true)
+  const [siteConfigSaving, setSiteConfigSaving] = useState(false)
+  const [siteConfigMessage, setSiteConfigMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketUpdates, setTicketUpdates] = useState(true)
 
   useEffect(() => {
@@ -108,6 +115,33 @@ const SettingsPage = () => {
     }
   }
 
+  // Fetch site config for admin
+  useEffect(() => {
+    if (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') {
+      api.get('/admin/site-config').then(res => {
+        const data = res.data?.data ?? res.data
+        if (data) {
+          setWhatsappNumber(data.whatsappNumber || '9779802348957')
+          setWhatsappMessage(data.whatsappMessage || '')
+          setWhatsappEnabled(data.whatsappEnabled ?? true)
+        }
+      }).catch(() => {})
+    }
+  }, [user])
+
+  const handleSiteConfigSave = async () => {
+    setSiteConfigSaving(true)
+    setSiteConfigMessage(null)
+    try {
+      await api.patch('/admin/site-config', { whatsappNumber, whatsappMessage, whatsappEnabled })
+      setSiteConfigMessage({ type: 'success', text: 'Site settings saved successfully.' })
+    } catch {
+      setSiteConfigMessage({ type: 'error', text: 'Failed to save site settings.' })
+    } finally {
+      setSiteConfigSaving(false)
+    }
+  }
+
   const handleToggle2FA = async () => {
     try {
       await api.post('/auth/2fa/toggle', { enable: !twoFactorEnabled })
@@ -127,6 +161,7 @@ const SettingsPage = () => {
               <Tab label='Profile' />
               <Tab label='Security' />
               <Tab label='Notifications' />
+              {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && <Tab label='Site Settings' />}
             </Tabs>
 
             {/* Profile Tab */}
@@ -297,6 +332,51 @@ const SettingsPage = () => {
                 </Box>
                 <Button variant='contained' sx={{ mt: 3 }}>
                   Save Preferences
+                </Button>
+              </Box>
+            )}
+            {/* Site Settings Tab (Admin only) */}
+            {currentTab === 3 && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+              <Box sx={{ maxWidth: 600 }}>
+                {siteConfigMessage && (
+                  <Alert severity={siteConfigMessage.type} onClose={() => setSiteConfigMessage(null)} sx={{ mb: 3 }}>
+                    {siteConfigMessage.text}
+                  </Alert>
+                )}
+
+                <Typography variant='h6' sx={{ mb: 1 }}>WhatsApp Chat Button</Typography>
+                <Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>
+                  Configure the floating WhatsApp chat button shown on all public pages.
+                </Typography>
+
+                <FormControlLabel
+                  control={<Switch checked={whatsappEnabled} onChange={(e) => setWhatsappEnabled(e.target.checked)} />}
+                  label='Enable WhatsApp chat button'
+                  sx={{ mb: 3 }}
+                />
+
+                <CustomTextField
+                  fullWidth label='WhatsApp Number' placeholder='9779802348957'
+                  value={whatsappNumber} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWhatsappNumber(e.target.value)}
+                  helperText='Include country code without + sign (e.g., 9779802348957)'
+                  sx={{ mb: 3 }}
+                  InputProps={{
+                    startAdornment: <InputAdornment position='start'><i className='tabler-brand-whatsapp' style={{ fontSize: 20, color: '#25D366' }} /></InputAdornment>,
+                  }}
+                />
+
+                <CustomTextField
+                  fullWidth label='Default Message' placeholder='Hello! I need help...'
+                  value={whatsappMessage} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWhatsappMessage(e.target.value)}
+                  helperText='Pre-filled message when customer clicks the WhatsApp button'
+                  multiline rows={2}
+                  sx={{ mb: 3 }}
+                />
+
+                <Divider sx={{ my: 3 }} />
+
+                <Button variant='contained' onClick={handleSiteConfigSave} disabled={siteConfigSaving}>
+                  {siteConfigSaving ? 'Saving...' : 'Save Site Settings'}
                 </Button>
               </Box>
             )}
