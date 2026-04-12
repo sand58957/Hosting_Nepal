@@ -16,6 +16,7 @@ import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 
 import { PrismaService } from '../../database/prisma.service';
+import { SendgridService } from '../email/services/sendgrid.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly sendgridService: SendgridService,
   ) {}
 
   // ─── Registration ──────────────────────────────────────────────────────
@@ -74,6 +76,17 @@ export class AuthService {
         verificationTokenExpiry,
       },
     });
+
+    // Send welcome + verification email
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'https://hostingnepals.com');
+    const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+    const firstName = user.name?.split(' ')[0] || 'User';
+
+    this.sendgridService.sendWelcome({ email: user.email, firstName })
+      .catch(err => this.logger.error(`Welcome email error: ${err.message}`));
+
+    this.sendgridService.sendVerificationEmail({ email: user.email, firstName }, verifyUrl)
+      .catch(err => this.logger.error(`Verification email error: ${err.message}`));
 
     this.eventEmitter.emit('auth.register', {
       userId: user.id,
@@ -266,6 +279,21 @@ export class AuthService {
         resetPasswordTokenExpiry: resetTokenExpiry,
       },
     });
+
+    // Send password reset email
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'https://hostingnepals.com');
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+    const firstName = user.name?.split(' ')[0] || 'User';
+
+    this.sendgridService.sendPasswordReset({ email: user.email, firstName }, resetUrl)
+      .then(result => {
+        if (result.success) {
+          this.logger.log(`Password reset email sent to: ${user.email}`);
+        } else {
+          this.logger.error(`Failed to send password reset email to: ${user.email}`);
+        }
+      })
+      .catch(err => this.logger.error(`Password reset email error: ${err.message}`));
 
     this.eventEmitter.emit('auth.forgot-password', {
       userId: user.id,
