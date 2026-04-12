@@ -255,7 +255,7 @@ const HomePage = () => {
   }
 
   const getSpec = (plan: Plan, key: string) => {
-    const s = plan.specs || {} as any
+    const s: Record<string, any> = plan.specs || {}
     const slug = plan.name?.toLowerCase().replace(/\s+/g, '-')
     const infra = infraMap[plan.id] || infraMap[slug]
 
