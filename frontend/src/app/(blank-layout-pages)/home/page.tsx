@@ -255,14 +255,15 @@ const HomePage = () => {
   }
 
   const getSpec = (plan: Plan, key: string) => {
-    const s = plan.specs || {}
-    const infra = infraMap[plan.id]
+    const s = plan.specs || {} as any
+    const slug = plan.name?.toLowerCase().replace(/\s+/g, '-')
+    const infra = infraMap[plan.id] || infraMap[slug]
 
-    if (key === 'cpu') return `${infra?.cpu || s.cpuCores || '?'} vCPU`
-    if (key === 'ram') return `${infra?.ram || s.ramGB || '?'} GB`
-    if (key === 'disk') return `${infra?.nvme || s.diskGB || '?'} GB`
-    if (key === 'bandwidth') return infra?.bw || 'Unlimited'
-    return '-'
+    if (key === 'cpu') return `${infra?.cpu || s.cpuCores || s.cpu || '—'} vCPU`
+    if (key === 'ram') return `${infra?.ram || s.ramGB || s.ram || '—'} GB`
+    if (key === 'disk') return `${infra?.nvme || s.diskGB || s.disk || s.storage || '—'} GB`
+    if (key === 'bandwidth') return infra?.bw || s.bandwidth || 'Unlimited'
+    return '—'
   }
 
   return (
@@ -989,100 +990,87 @@ const HomePage = () => {
             </Paper>
           </Box>
 
-          {/* Contabo-style comparison table */}
+          {/* Pricing Cards Grid */}
           {filteredPlans.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress size={32} sx={{ color: '#7367F0' }} /></Box>
           ) : (
-              <Box sx={{ overflowX: 'auto', pb: 2, WebkitOverflowScrolling: 'touch' }}>
-                <Box sx={{ display: 'flex', minWidth: { xs: 600, sm: 700, md: 900 }, gap: 0 }}>
-                  {/* Left spec labels column */}
-                  <Box sx={{ width: { xs: 100, sm: 140, md: 180 }, flexShrink: 0, pt: '220px', display: { xs: 'none', sm: 'block' } }}>
-                    <Typography variant='subtitle2' sx={{ color: 'rgba(255,255,255,0.4)', mb: 2.5, px: 1, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
-                      Specs
-                    </Typography>
-                    {specLabels.map((spec, i) => (
-                      <Box key={spec.key} sx={{
-                        display: 'flex', alignItems: 'center', gap: 1, px: 1, height: 48,
-                        borderBottom: i < specLabels.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none'
-                      }}>
-                        <i className={spec.icon} style={{ fontSize: 16, color: 'rgba(255,255,255,0.35)' }} />
-                        <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{spec.label}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-
-                  {/* Plan columns */}
-                  {visiblePlans.map((plan, planIdx) => {
-                    const isBest = plan.popular || planIdx === 1
-                    const borderColor = isBest ? '#28C76F' : 'rgba(255,255,255,0.1)'
-
-                    return (
-                      <Box key={plan.id} sx={{
-                        flex: 1, minWidth: { xs: 120, sm: 140, md: 160 }, mx: 0.5,
-                        border: '2px solid', borderColor,
-                        borderRadius: 3, overflow: 'hidden', position: 'relative',
-                        bgcolor: isBest ? 'rgba(40,199,111,0.04)' : 'rgba(255,255,255,0.02)',
-                        transition: '0.3s',
-                        '&:hover': { borderColor: isBest ? '#28C76F' : '#7367F0', transform: 'translateY(-4px)' }
-                      }}>
-                        {/* Best selling badge */}
-                        {isBest && (
-                          <Box sx={{ bgcolor: '#28C76F', py: 0.6, textAlign: 'center' }}>
-                            <Typography variant='caption' sx={{ color: '#fff', fontWeight: 700, letterSpacing: 0.5, fontSize: '0.7rem' }}>
-                              BEST SELLING
-                            </Typography>
-                          </Box>
-                        )}
-
-                        {/* Plan header */}
-                        <Box sx={{ textAlign: 'center', py: 3, px: 1.5, bgcolor: isBest ? 'rgba(40,199,111,0.06)' : 'transparent' }}>
-                          <Typography variant='subtitle1' fontWeight={700} sx={{ color: '#fff' }}>{plan.name}</Typography>
-                          <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'line-through' }}>
-                            NPR {Math.round(plan.priceMonthly * 1.2).toLocaleString()}
+            <Grid container spacing={3} justifyContent='center'>
+              {visiblePlans.map((plan, planIdx) => {
+                const isBest = plan.popular || planIdx === 1
+                return (
+                  <Grid size={{ xs: 12, sm: 6, md: visiblePlans.length <= 3 ? 4 : visiblePlans.length <= 4 ? 3 : 2.4 }} key={plan.id}>
+                    <Box sx={{
+                      border: '2px solid', borderColor: isBest ? '#28C76F' : 'rgba(255,255,255,0.1)',
+                      borderRadius: 3, overflow: 'hidden',
+                      bgcolor: isBest ? 'rgba(40,199,111,0.04)' : 'rgba(255,255,255,0.02)',
+                      transition: '0.3s', height: '100%',
+                      '&:hover': { borderColor: isBest ? '#28C76F' : '#7367F0', transform: 'translateY(-6px)', boxShadow: '0 12px 40px rgba(0,0,0,0.3)' }
+                    }}>
+                      {/* Best selling badge */}
+                      {isBest && (
+                        <Box sx={{ bgcolor: '#28C76F', py: 0.6, textAlign: 'center' }}>
+                          <Typography variant='caption' sx={{ color: '#fff', fontWeight: 700, letterSpacing: 0.5, fontSize: '0.7rem' }}>
+                            BEST SELLING
                           </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', mt: 0.5 }}>
-                            <Typography variant='h3' fontWeight={800} sx={{ color: '#fff', fontSize: { xs: '1.4rem', sm: '1.8rem', md: '2.2rem' }, lineHeight: 1 }}>
-                              {Math.floor(plan.priceMonthly).toLocaleString()}
-                            </Typography>
-                            <Box sx={{ ml: 0.5 }}>
-                              <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', lineHeight: 1.2 }}>
-                                <sup style={{ fontSize: '0.7rem', fontWeight: 700, color: '#fff' }}>
-                                  .{String(plan.priceMonthly % 1 > 0 ? Math.round((plan.priceMonthly % 1) * 100) : '00').padStart(2, '0')}
-                                </sup>
-                              </Typography>
-                              <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.7rem' }}>NPR/mo</Typography>
-                            </Box>
-                          </Box>
-                          <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)', display: 'block', mt: 0.5 }}>
-                            NPR {plan.priceYearly?.toLocaleString()}/yr
-                          </Typography>
-
-                          <Button variant='contained' disableElevation fullWidth onClick={() => router.push('/register')}
-                            sx={{
-                              mt: 2, borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.2,
-                              bgcolor: isBest ? '#28C76F' : '#7367F0',
-                              '&:hover': { bgcolor: isBest ? '#1FAF5E' : '#5E50EE' }
-                            }}>
-                            Get Started
-                          </Button>
                         </Box>
+                      )}
 
-                        {/* Spec rows */}
+                      {/* Plan header */}
+                      <Box sx={{ textAlign: 'center', py: 3, px: 2, bgcolor: isBest ? 'rgba(40,199,111,0.06)' : 'transparent' }}>
+                        <Typography variant='subtitle1' fontWeight={700} sx={{ color: '#fff', mb: 0.5 }}>{plan.name}</Typography>
+                        <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'line-through' }}>
+                          NPR {Math.round(plan.priceMonthly * 1.2).toLocaleString()}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', mt: 0.5, mb: 0.5 }}>
+                          <Typography variant='h3' fontWeight={800} sx={{ color: '#fff', fontSize: { xs: '1.6rem', md: '2rem' }, lineHeight: 1 }}>
+                            {Math.floor(plan.priceMonthly).toLocaleString()}
+                          </Typography>
+                          <Box sx={{ ml: 0.5 }}>
+                            <Typography variant='caption' sx={{ color: '#fff', fontWeight: 700, fontSize: '0.7rem' }}>
+                              .{String(plan.priceMonthly % 1 > 0 ? Math.round((plan.priceMonthly % 1) * 100) : '00').padStart(2, '0')}
+                            </Typography>
+                            <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.7rem', display: 'block' }}>NPR/mo</Typography>
+                          </Box>
+                        </Box>
+                        <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                          NPR {plan.priceYearly?.toLocaleString()}/yr
+                        </Typography>
+                      </Box>
+
+                      {/* Spec rows */}
+                      <Box sx={{ px: 2, py: 1 }}>
                         {specLabels.map((spec, i) => (
                           <Box key={spec.key} sx={{
-                            textAlign: 'center', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            borderTop: '1px solid rgba(255,255,255,0.06)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            py: 1.2, borderBottom: i < specLabels.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                           }}>
-                            <Typography variant='body2' fontWeight={600} sx={{ color: '#fff' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <i className={spec.icon} style={{ fontSize: 15, color: 'rgba(255,255,255,0.35)' }} />
+                              <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.5)' }}>{spec.label}</Typography>
+                            </Box>
+                            <Typography variant='body2' fontWeight={700} sx={{ color: '#fff' }}>
                               {getSpec(plan, spec.key)}
                             </Typography>
                           </Box>
                         ))}
                       </Box>
-                    )
-                  })}
-                </Box>
-              </Box>
+
+                      {/* CTA */}
+                      <Box sx={{ px: 2, pb: 2.5, pt: 1 }}>
+                        <Button variant='contained' disableElevation fullWidth onClick={() => router.push('/register')}
+                          sx={{
+                            borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.2,
+                            bgcolor: isBest ? '#28C76F' : '#7367F0',
+                            '&:hover': { bgcolor: isBest ? '#1FAF5E' : '#5E50EE' }
+                          }}>
+                          Get Started
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Grid>
+                )
+              })}
+            </Grid>
           )}
 
           {filteredPlans.length > 5 && (
