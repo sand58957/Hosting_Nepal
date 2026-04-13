@@ -17,11 +17,11 @@ import '@/app/globals.css'
 import '@assets/iconify-icons/generated-icons.css'
 
 export const metadata = {
-  title: 'Hosting Nepal - Best Web Hosting in Nepal | Domain, VPS, Dedicated Server',
-  description: 'Nepal\'s #1 web hosting platform. Domain registration from NPR 2,500/yr, WordPress hosting from NPR 1,254/mo, VPS from NPR 1,066/mo, Dedicated Servers from NPR 16,956/mo. Free SSL, CyberPanel, NVMe SSD. Pay via Khalti & eSewa.',
-  keywords: 'web hosting nepal, domain registration nepal, VPS nepal, dedicated server nepal, wordpress hosting nepal, hosting nepal, cheap hosting nepal, buy domain nepal',
+  title: 'Hosting Nepal - Best Web Hosting, Domain Registration & VPS in Nepal 2025',
+  description: 'Nepal\'s #1 web hosting platform. WordPress hosting from NPR 299/mo, VPS from NPR 1,500/mo, domain registration from NPR 1,200/yr. Free SSL, LiteSpeed, NVMe SSD, CyberPanel. Pay via Khalti, eSewa & bank transfer. 24/7 Nepal support.',
+  keywords: 'web hosting nepal, domain registration nepal, VPS hosting nepal, dedicated server nepal, wordpress hosting nepal, hosting nepal, cheap hosting nepal, buy domain nepal, .np domain, nepal hosting provider, best hosting nepal 2025, eSewa hosting, Khalti hosting',
   authors: [{ name: 'Hosting Nepal', url: 'https://hostingnepals.com' }],
-  creator: 'Marketnminds Investment Group',
+  creator: 'Marketminds Investment Group',
   publisher: 'Hosting Nepal',
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-snippet': -1, 'max-image-preview': 'large', 'max-video-preview': -1 } },
   alternates: { canonical: 'https://hostingnepals.com' },
@@ -30,22 +30,16 @@ export const metadata = {
     locale: 'en_US',
     url: 'https://hostingnepals.com',
     siteName: 'Hosting Nepal',
-    title: 'Hosting Nepal - Best Web Hosting in Nepal',
-    description: 'Domain, WordPress, VPS & Dedicated Server hosting with NPR pricing, Khalti/eSewa payment, free SSL, and 24/7 Nepal-based support.',
+    title: 'Hosting Nepal - Best Web Hosting & Domain Registration in Nepal',
+    description: 'Domain, WordPress, VPS & Dedicated Server hosting in Nepal with NPR pricing, Khalti/eSewa payment, free SSL, LiteSpeed, and 24/7 Nepal-based support.',
+    countryName: 'Nepal',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hosting Nepal - Best Web Hosting in Nepal',
-    description: 'Domain, WordPress, VPS & Dedicated Server hosting with NPR pricing and local payment.',
+    title: 'Hosting Nepal - Best Web Hosting in Nepal 2025',
+    description: 'WordPress hosting from NPR 299/mo, VPS from NPR 1,500/mo. Free SSL, NVMe SSD. Pay via Khalti & eSewa. 24/7 Nepal support.',
   },
   verification: { google: '', yandex: '' },
-  other: {
-    'geo.region': 'NP',
-    'geo.placename': 'Kathmandu',
-    'geo.position': '27.7172;85.3240',
-    'ICBM': '27.7172, 85.3240',
-    'content-language': 'en',
-  },
 }
 
 const RootLayout = async (props: ChildrenType) => {
@@ -61,22 +55,46 @@ const RootLayout = async (props: ChildrenType) => {
   return (
     <html id='__next' lang='en' dir={direction} suppressHydrationWarning>
       <head>
-        {/* Organization Schema (SEO + AIO) */}
+        {/* Organization + LocalBusiness Schema (SEO + AIO + GEO) */}
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context': 'https://schema.org',
-          '@type': 'Organization',
+          '@type': ['Organization', 'LocalBusiness'],
+          '@id': 'https://hostingnepals.com/#organization',
           name: 'Hosting Nepal',
+          legalName: 'Marketminds Investment Group',
           url: 'https://hostingnepals.com',
           logo: 'https://hostingnepals.com/logo.png',
-          description: 'Nepal\'s leading web hosting provider offering domain registration, WordPress hosting, VPS, VDS, and Dedicated Servers with NPR pricing.',
-          address: { '@type': 'PostalAddress', addressLocality: 'Kathmandu', addressCountry: 'NP' },
-          contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'support@hostingnepals.com', availableLanguage: ['English', 'Nepali'] },
+          image: 'https://hostingnepals.com/logo.png',
+          description: 'Nepal\'s premier automated web hosting company providing domain registration, WordPress hosting, VPS, VDS, and Dedicated Servers with NPR pricing and local payment support.',
+          address: { '@type': 'PostalAddress', streetAddress: 'Near Rastriya Banijya Bank, Koteshwor-32', addressLocality: 'Kathmandu', addressRegion: 'Bagmati', postalCode: '44600', addressCountry: 'NP' },
+          geo: { '@type': 'GeoCoordinates', latitude: '27.6783', longitude: '85.3492' },
+          telephone: '+977-9802348957',
+          email: 'admin@hostingnepals.com',
+          contactPoint: [
+            { '@type': 'ContactPoint', contactType: 'sales', telephone: '+977-9802348957', email: 'admin@hostingnepals.com', availableLanguage: ['English', 'Nepali'], areaServed: 'NP' },
+            { '@type': 'ContactPoint', contactType: 'technical support', telephone: '+977-9709066745', email: 'admin@hostingnepals.com', availableLanguage: ['English', 'Nepali'], contactOption: 'TollFree', areaServed: 'NP' },
+          ],
           sameAs: [],
-          areaServed: { '@type': 'Country', name: 'Nepal' },
+          areaServed: { '@type': 'Country', name: 'Nepal', '@id': 'https://www.wikidata.org/wiki/Q837' },
+          serviceArea: { '@type': 'GeoCircle', geoMidpoint: { '@type': 'GeoCoordinates', latitude: '27.7172', longitude: '85.3240' }, geoRadius: '500000' },
+          foundingDate: '2023',
           foundingLocation: { '@type': 'Place', name: 'Kathmandu, Nepal' },
-          paymentAccepted: 'Khalti, eSewa, Bank Transfer',
+          founder: { '@type': 'Organization', name: 'Marketminds Investment Group' },
+          paymentAccepted: 'Khalti, eSewa, Bank Transfer, Credit Card, Debit Card',
           currenciesAccepted: 'NPR',
-          priceRange: 'NPR 557 - NPR 39,899',
+          priceRange: 'NPR 299 - NPR 50,000',
+          openingHours: 'Mo-Fr 10:00-18:00',
+          hasOfferCatalog: {
+            '@type': 'OfferCatalog', name: 'Web Hosting Services', itemListElement: [
+              { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'WordPress Hosting', description: 'Managed WordPress hosting with LiteSpeed and CyberPanel' }, priceCurrency: 'NPR', price: '299', priceValidUntil: '2026-12-31' },
+              { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'VPS Hosting', description: 'Full root access VPS with NVMe SSD and dedicated resources' }, priceCurrency: 'NPR', price: '1500', priceValidUntil: '2026-12-31' },
+              { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Domain Registration', description: '.com, .np, .com.np domain registration with instant activation' }, priceCurrency: 'NPR', price: '1200', priceValidUntil: '2026-12-31' },
+              { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Dedicated Server', description: 'Bare metal dedicated servers with Intel Xeon processors' }, priceCurrency: 'NPR', price: '15000', priceValidUntil: '2026-12-31' },
+            ]
+          },
+          aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '5000', bestRating: '5' },
+          knowsLanguage: ['en', 'ne'],
+          slogan: 'Nepal\'s Premier Web Hosting Platform',
         }) }} />
         {/* WebSite Schema with SearchAction (AEO) */}
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify({

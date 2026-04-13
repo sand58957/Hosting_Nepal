@@ -1,15 +1,83 @@
+# Hosting Nepal - Robots.txt
+# Allow all search engines and AI bots for SEO/AEO/AIO visibility
+
 User-agent: *
 Allow: /
 Allow: /home
 Allow: /articles
 Allow: /articles/*
+Allow: /about
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /hosting/plans
+Allow: /vps/order
+Allow: /domains/search
+Allow: /email
+Allow: /ssl
 
 Disallow: /dashboard
+Disallow: /dashboard/*
 Disallow: /blog
+Disallow: /blog/*
 Disallow: /billing
+Disallow: /billing/*
 Disallow: /support
+Disallow: /support/*
 Disallow: /settings
-Disallow: /login
-Disallow: /register
+Disallow: /users
+Disallow: /containers
+Disallow: /containers/*
+Disallow: /hosting/tools/*
+Disallow: /hosting/security/*
+Disallow: /hosting/speed/*
+Disallow: /hosting/email/*
+Disallow: /hosting/domains/*
+Disallow: /hosting/wordpress/*
+Disallow: /domains/dns
+Disallow: /domains/portfolio
+Disallow: /domains/settings/*
+Disallow: /domains/investor/*
+Disallow: /domains/activity-log
+Disallow: /vps/*/
+
+# Explicitly allow AI search bots for AIO/AEO ranking
+User-agent: GPTBot
+Allow: /
+Allow: /articles/*
+Allow: /home
+Allow: /about
+
+User-agent: Google-Extended
+Allow: /
+Allow: /articles/*
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /articles/*
+
+User-agent: Applebot-Extended
+Allow: /
+Allow: /articles/*
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /articles/*
+
+User-agent: Amazonbot
+Allow: /
+Allow: /articles/*
+
+User-agent: Bytespider
+Allow: /
+Allow: /articles/*
+
+User-agent: CCBot
+Allow: /
+Allow: /articles/*
+
+User-agent: meta-externalagent
+Allow: /
+Allow: /articles/*
 
 Sitemap: https://hostingnepals.com/sitemap.xml
