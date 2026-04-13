@@ -177,8 +177,8 @@ const DashboardPage = () => {
             <Button variant='contained' startIcon={<i className='tabler-world' />} onClick={() => router.push('/domains')}>
               Register Domain
             </Button>
-            <Button variant='contained' color='success' startIcon={<i className='tabler-brand-wordpress' />} onClick={() => router.push('/hosting/plans')}>
-              WordPress Hosting
+            <Button variant='contained' color='success' startIcon={<i className='tabler-server' />} onClick={() => router.push('/hosting')}>
+              Buy Hosting
             </Button>
             <Button variant='contained' color='info' startIcon={<i className='tabler-cloud' />} onClick={() => router.push('/vps')}>
               Create VPS
