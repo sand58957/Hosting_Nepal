@@ -77,7 +77,7 @@ export class DomainController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @Get('pricing')
-  @ApiOperation({ summary: 'Get domain pricing for all popular TLDs (NPR with 80% margin)' })
+  @ApiOperation({ summary: 'Get domain pricing for all popular TLDs (NPR with 20% margin)' })
   @ApiResponse({ status: 200, description: 'Pricing list for all TLDs' })
   async getDomainPricing() {
     const pricing = await this.domainService.getAllTldPricing();

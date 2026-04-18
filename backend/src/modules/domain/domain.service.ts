@@ -48,7 +48,7 @@ const TLD_PRODUCT_KEY_MAP: Record<string, string> = {
 // Nepal Rupee exchange rate (approx) — 1 USD = 133 NPR
 const USD_TO_NPR = 133;
 // Margin percentage applied on top of NameSilo cost price
-const MARGIN_PERCENT = 50;
+const MARGIN_PERCENT = 20;
 
 @Injectable()
 export class DomainService {
@@ -72,7 +72,7 @@ export class DomainService {
   }
 
   /**
-   * Get domain pricing for a TLD with 50% margin, converted to NPR.
+   * Get domain pricing for a TLD with 20% margin, converted to NPR.
    * Uses NameSilo as the primary pricing source.
    */
   async getDomainPricing(tld: string): Promise<{ registerPrice: number; renewPrice: number; transferPrice: number; restorePrice: number; currency: string }> {

@@ -98,6 +98,26 @@ const popularTlds = ['.com', '.np', '.com.np', '.net', '.org', '.in', '.xyz', '.
 const planTabs = ['WORDPRESS', 'VPS', 'VDS', 'DEDICATED']
 const planTabLabels = ['WordPress', 'VPS', 'VDS', 'Dedicated']
 
+const fallbackPlans: Plan[] = [
+  { id: 'wp-starter', name: 'WP StartUp', type: 'WORDPRESS', priceMonthly: 1254, priceYearly: 7632, currency: 'NPR', features: [], specs: { diskGB: 10 }, },
+  { id: 'wp-essential', name: 'WP Essential', type: 'WORDPRESS', priceMonthly: 1354, priceYearly: 8592, currency: 'NPR', features: [], specs: { diskGB: 20 }, },
+  { id: 'wp-business', name: 'WP Business', type: 'WORDPRESS', priceMonthly: 1613, priceYearly: 11460, currency: 'NPR', features: [], specs: { diskGB: 30 }, popular: true },
+  { id: 'wp-developer', name: 'WP Developer', type: 'WORDPRESS', priceMonthly: 1893, priceYearly: 14340, currency: 'NPR', features: [], specs: { diskGB: 40 }, },
+  { id: 'vps-10', name: 'VPS 10', type: 'VPS', priceMonthly: 799, priceYearly: 7990, currency: 'NPR', features: [], specs: { diskGB: 75, cpuCores: 4, ramGB: 8 }, },
+  { id: 'vps-20', name: 'VPS 20', type: 'VPS', priceMonthly: 1243, priceYearly: 12430, currency: 'NPR', features: [], specs: { diskGB: 100, cpuCores: 6, ramGB: 12 }, popular: true },
+  { id: 'vps-30', name: 'VPS 30', type: 'VPS', priceMonthly: 2486, priceYearly: 24860, currency: 'NPR', features: [], specs: { diskGB: 200, cpuCores: 8, ramGB: 24 }, },
+  { id: 'vps-40', name: 'VPS 40', type: 'VPS', priceMonthly: 4440, priceYearly: 44400, currency: 'NPR', features: [], specs: { diskGB: 250, cpuCores: 12, ramGB: 48 }, },
+  { id: 'vps-50', name: 'VPS 50', type: 'VPS', priceMonthly: 6571, priceYearly: 65710, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 16, ramGB: 64 }, },
+  { id: 'vds-s', name: 'VDS S', type: 'VDS', priceMonthly: 6110, priceYearly: 61100, currency: 'NPR', features: [], specs: { diskGB: 180, cpuCores: 3, ramGB: 24 }, },
+  { id: 'vds-m', name: 'VDS M', type: 'VDS', priceMonthly: 7956, priceYearly: 79560, currency: 'NPR', features: [], specs: { diskGB: 240, cpuCores: 4, ramGB: 32 }, popular: true },
+  { id: 'vds-l', name: 'VDS L', type: 'VDS', priceMonthly: 11366, priceYearly: 113660, currency: 'NPR', features: [], specs: { diskGB: 360, cpuCores: 6, ramGB: 48 }, },
+  { id: 'vds-xl', name: 'VDS XL', type: 'VDS', priceMonthly: 14634, priceYearly: 146340, currency: 'NPR', features: [], specs: { diskGB: 480, cpuCores: 8, ramGB: 64 }, },
+  { id: 'ded-1', name: 'DS Intel Xeon E3', type: 'DEDICATED', priceMonthly: 16956, priceYearly: 169560, currency: 'NPR', features: [], specs: { diskGB: 500, cpuCores: 4, ramGB: 8 }, },
+  { id: 'ded-2', name: 'DS Intel Xeon E5', type: 'DEDICATED', priceMonthly: 17949, priceYearly: 179490, currency: 'NPR', features: [], specs: { diskGB: 1000, cpuCores: 8, ramGB: 16 }, popular: true },
+  { id: 'ded-3', name: 'DS Dual Xeon E5', type: 'DEDICATED', priceMonthly: 23139, priceYearly: 231390, currency: 'NPR', features: [], specs: { diskGB: 2000, cpuCores: 16, ramGB: 32 }, },
+  { id: 'ded-4', name: 'DS Xeon Scalable', type: 'DEDICATED', priceMonthly: 25938, priceYearly: 259380, currency: 'NPR', features: [], specs: { diskGB: 2000, cpuCores: 24, ramGB: 64 }, },
+]
+
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
 // ── Glass pill style ────────────────────────────────────────────────────────
@@ -169,10 +189,11 @@ const useScrollAnimations = () => {
 // ── Component ───────────────────────────────────────────────────────────────
 const HomePage = () => {
   const router = useRouter()
-  const [plans, setPlans] = useState<Plan[]>([])
+  const [plans, setPlans] = useState<Plan[]>(fallbackPlans)
   const [domainPrices, setDomainPrices] = useState<DomainPrice[]>([])
   const [blogPosts, setBlogPosts] = useState<any[]>([])
   const [pricingTab, setPricingTab] = useState(0)
+  const [plansNotice, setPlansNotice] = useState<string | null>(null)
   const [subEmail, setSubEmail] = useState('')
   const [subLoading, setSubLoading] = useState(false)
   const [subMsg, setSubMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -203,7 +224,18 @@ const HomePage = () => {
 
       if (plansRes.status === 'fulfilled') {
         const raw = plansRes.value.data?.data?.data ?? plansRes.value.data?.data ?? plansRes.value.data
-        setPlans(Array.isArray(raw) ? raw : Array.isArray(raw?.plans) ? raw.plans : [])
+        const nextPlans = Array.isArray(raw) ? raw : Array.isArray(raw?.plans) ? raw.plans : []
+
+        if (nextPlans.length > 0) {
+          setPlans(nextPlans)
+          setPlansNotice(null)
+        } else {
+          setPlans(fallbackPlans)
+          setPlansNotice('Showing standard pricing while live plan data is temporarily unavailable.')
+        }
+      } else {
+        setPlans(fallbackPlans)
+        setPlansNotice('Showing standard pricing while live plan data is temporarily unavailable.')
       }
 
       if (domainsRes.status === 'fulfilled') {
@@ -993,9 +1025,31 @@ const HomePage = () => {
             </Paper>
           </Box>
 
+          {plansNotice && (
+            <Alert
+              severity='info'
+              variant='outlined'
+              sx={{
+                mb: 4,
+                mx: 'auto',
+                maxWidth: 720,
+                color: '#D9D5FF',
+                borderColor: 'rgba(115,103,240,0.35)',
+                bgcolor: 'rgba(115,103,240,0.08)',
+                '& .MuiAlert-icon': { color: '#A89CF5' },
+              }}
+            >
+              {plansNotice}
+            </Alert>
+          )}
+
           {/* Pricing Cards Grid */}
           {filteredPlans.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress size={32} sx={{ color: '#7367F0' }} /></Box>
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                No plans are available in this category right now.
+              </Typography>
+            </Box>
           ) : (
             <Grid container spacing={3} justifyContent='center'>
               {visiblePlans.map((plan, planIdx) => {
