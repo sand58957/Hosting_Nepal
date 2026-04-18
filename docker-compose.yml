@@ -53,6 +53,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: https://api.hostingnepals.com/api/v1
       NEXT_PUBLIC_APP_URL: https://hostingnepals.com
+      INTERNAL_API_URL: http://hn-backend:4001/api/v1
     ports:
       - "127.0.0.1:3001:3000"
     depends_on:

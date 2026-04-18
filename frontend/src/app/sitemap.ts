@@ -1,6 +1,10 @@
 import type { MetadataRoute } from 'next'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001/api/v1'
+// Use internal Docker URL for server-side fetches (sitemap runs on server, not browser)
+const API_URL = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001/api/v1'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // Revalidate every hour
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hostingnepals.com'
@@ -28,7 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     // Fetch all blog posts with pagination (no cap)
-    const firstRes = await fetch(`${API_URL}/blog/posts?limit=50&page=1`, { next: { revalidate: 300 } })
+    const firstRes = await fetch(`${API_URL}/blog/posts?limit=50&page=1`, { cache: 'no-store' })
     const firstJson = await firstRes.json()
     const allPosts: any[] = firstJson?.data?.data || []
     const totalPages = firstJson?.data?.meta?.totalPages || 1
@@ -36,7 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (totalPages > 1) {
       const remaining = await Promise.all(
         Array.from({ length: totalPages - 1 }, (_, i) =>
-          fetch(`${API_URL}/blog/posts?limit=50&page=${i + 2}`, { next: { revalidate: 300 } }).then(r => r.json())
+          fetch(`${API_URL}/blog/posts?limit=50&page=${i + 2}`, { cache: 'no-store' }).then(r => r.json())
         )
       )
 
