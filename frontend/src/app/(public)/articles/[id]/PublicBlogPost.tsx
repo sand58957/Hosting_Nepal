@@ -28,7 +28,7 @@ interface Post {
   author: { name: string; email: string }
   category: { name: string; slug: string } | null
   tags: { name: string; slug: string }[]
-  jsonLd: Record<string, any>
+  jsonLd: Record<string, any> | Record<string, any>[]
 }
 
 // Simple markdown to HTML converter
@@ -179,9 +179,9 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a', overflowX: 'hidden' }}>
       {/* JSON-LD */}
-      {post.jsonLd && (
-        <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(post.jsonLd) }} />
-      )}
+      {post.jsonLd && (Array.isArray(post.jsonLd) ? post.jsonLd : [post.jsonLd]).map((schema, i) => (
+        <script key={i} type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+      ))}
 
       {/* Navbar */}
       <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, bgcolor: 'rgba(15,15,26,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -251,6 +251,7 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
                 <Typography variant='body2' sx={{ color: '#fff', fontWeight: 600 }}>{post.author.name}</Typography>
                 <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)' }}>
                   {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                  {post.updatedAt && post.updatedAt !== post.publishedAt ? ` | Updated ${new Date(post.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
                   {post.views > 0 ? ` | ${post.views.toLocaleString()} views` : ''}
                 </Typography>
               </Box>

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsArray, IsUUID, MaxLength, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, IsUUID, MaxLength, IsDateString, ValidateNested } from 'class-validator';
 import { BlogPostStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class CreateBlogPostDto {
   @ApiProperty({ description: 'Blog post title', maxLength: 500 })
@@ -68,4 +69,14 @@ export class CreateBlogPostDto {
   @IsString()
   @MaxLength(500)
   ogImage?: string;
+
+  @ApiPropertyOptional({ description: 'FAQ items for FAQ schema [{question, answer}]', type: 'array' })
+  @IsOptional()
+  @IsArray()
+  faqItems?: Array<{ question: string; answer: string }>;
+
+  @ApiPropertyOptional({ description: 'HowTo steps for HowTo schema [{name, text}]', type: 'array' })
+  @IsOptional()
+  @IsArray()
+  howtoSteps?: Array<{ name: string; text: string }>;
 }

@@ -832,6 +832,8 @@ model BlogPost {
   seoDescription      String?         @map("seo_description") @db.VarChar(500)
   seoKeywords         String?         @map("seo_keywords") @db.VarChar(500)
   ogImage             String?         @map("og_image") @db.VarChar(500)
+  faqItems            Json?           @map("faq_items")
+  howtoSteps          Json?           @map("howto_steps")
   views               Int             @default(0)
   readTime            Int?            @map("read_time")
   deletedAt           DateTime?       @map("deleted_at")

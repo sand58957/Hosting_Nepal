@@ -46,6 +46,8 @@ export class BlogPostService {
         seoDescription: dto.seoDescription,
         seoKeywords: dto.seoKeywords,
         ogImage: dto.ogImage,
+        faqItems: dto.faqItems ? JSON.parse(JSON.stringify(dto.faqItems)) : undefined,
+        howtoSteps: dto.howtoSteps ? JSON.parse(JSON.stringify(dto.howtoSteps)) : undefined,
         readTime,
       },
       include: BLOG_POST_INCLUDE,
@@ -124,17 +126,118 @@ export class BlogPostService {
       console.warn('View increment failed:', e.message);
     });
 
-    const jsonLd = {
+    // --- Rich Article Schema ---
+    const articleSchema: any = {
       '@context': 'https://schema.org',
       '@type': 'Article',
       headline: post.seoTitle || post.title,
       description: post.seoDescription || post.excerpt || '',
       image: post.ogImage || post.featuredImage || '',
-      author: { '@type': 'Person', name: post.author.name },
+      url: `https://hostingnepals.com/articles/${post.slug}`,
+      wordCount: post.content ? post.content.split(/\s+/).length : 0,
+      keywords: post.seoKeywords || '',
+      articleSection: (post as any).category?.name || 'Web Hosting',
+      inLanguage: 'en',
+      author: {
+        '@type': 'Person',
+        name: post.author.name || 'Hosting Nepal Team',
+        url: 'https://hostingnepals.com/about',
+      },
       datePublished: post.publishedAt?.toISOString(),
       dateModified: post.updatedAt.toISOString(),
-      publisher: { '@type': 'Organization', name: 'Hosting Nepal' },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Hosting Nepal',
+        url: 'https://hostingnepals.com',
+        logo: { '@type': 'ImageObject', url: 'https://hostingnepals.com/logo.png' },
+      },
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': `https://hostingnepals.com/articles/${post.slug}`,
+      },
     };
+
+    // --- BreadcrumbList Schema ---
+    const breadcrumbSchema: any = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://hostingnepals.com' },
+        { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://hostingnepals.com/articles' },
+      ],
+    };
+    if ((post as any).category) {
+      breadcrumbSchema.itemListElement.push({
+        '@type': 'ListItem', position: 3,
+        name: (post as any).category.name,
+        item: `https://hostingnepals.com/articles?category=${(post as any).category.slug}`,
+      });
+      breadcrumbSchema.itemListElement.push({
+        '@type': 'ListItem', position: 4, name: post.title,
+      });
+    } else {
+      breadcrumbSchema.itemListElement.push({
+        '@type': 'ListItem', position: 3, name: post.title,
+      });
+    }
+
+    // --- FAQ Schema (from faqItems or auto-extracted from content) ---
+    let faqSchema: any = null;
+    const faqData = (post as any).faqItems as any[];
+    if (faqData && Array.isArray(faqData) && faqData.length > 0) {
+      faqSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqData.map((faq: any) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+        })),
+      };
+    } else {
+      // Auto-extract FAQs from markdown content (### headings with ? followed by text)
+      const faqRegex = /###\s+(.+\?)\s*\n+([^#]+?)(?=\n###|\n##|\n#|$)/g;
+      const autoFaqs: Array<{ question: string; answer: string }> = [];
+      let match;
+      while ((match = faqRegex.exec(post.content || '')) !== null && autoFaqs.length < 10) {
+        const answer = match[2].trim().replace(/\n+/g, ' ').substring(0, 500);
+        if (answer.length > 20) {
+          autoFaqs.push({ question: match[1].trim(), answer });
+        }
+      }
+      if (autoFaqs.length > 0) {
+        faqSchema = {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: autoFaqs.map(faq => ({
+            '@type': 'Question',
+            name: faq.question,
+            acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+          })),
+        };
+      }
+    }
+
+    // --- HowTo Schema (from howtoSteps) ---
+    let howtoSchema: any = null;
+    const howtoData = (post as any).howtoSteps as any[];
+    if (howtoData && Array.isArray(howtoData) && howtoData.length > 0) {
+      howtoSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'HowTo',
+        name: post.title,
+        description: post.seoDescription || post.excerpt || '',
+        step: howtoData.map((step: any, i: number) => ({
+          '@type': 'HowToStep',
+          position: i + 1,
+          name: step.name,
+          text: step.text,
+        })),
+      };
+    }
+
+    // Combine all schemas into an array
+    const jsonLd = [articleSchema, breadcrumbSchema, faqSchema, howtoSchema].filter(Boolean);
 
     return { ...flattenPostTags(post), jsonLd };
   }

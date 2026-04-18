@@ -101,6 +101,7 @@ const BlogCreatePage = () => {
         tagIds: selectedTags.length ? selectedTags : undefined,
         seoTitle: seoTitle || undefined, seoDescription: seoDescription || undefined,
         seoKeywords: seoKeywords || undefined, ogImage: ogImage || undefined,
+        faqItems: faqItems.length ? faqItems.map(f => ({ question: f.q, answer: f.a })) : undefined,
       }
 
       await api.post('/blog/posts', body)
