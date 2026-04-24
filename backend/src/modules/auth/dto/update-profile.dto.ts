@@ -5,6 +5,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -15,6 +16,9 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/[\s\-()]/g, '') : value,
+  )
   @Matches(/^(\+977)?[9][6-9]\d{8}$/, {
     message:
       'Phone number must be a valid Nepal mobile number (e.g., +9779812345678 or 9812345678)',

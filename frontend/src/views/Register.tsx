@@ -87,7 +87,9 @@ const Register = ({ mode }: { mode: SystemMode }) => {
     setLoading(true)
 
     try {
-      await api.post('/auth/register', { name, email, phone, password })
+      const normalizedPhone = phone.replace(/[\s\-()]/g, '')
+
+      await api.post('/auth/register', { name, email, phone: normalizedPhone, password })
       setSuccess('Registration successful! Please check your email to verify your account.')
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
@@ -147,6 +149,7 @@ const Register = ({ mode }: { mode: SystemMode }) => {
                 placeholder='Enter your full name'
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                slotProps={{ htmlInput: { autoComplete: 'name' } }}
               />
               <CustomTextField
                 fullWidth
@@ -155,22 +158,26 @@ const Register = ({ mode }: { mode: SystemMode }) => {
                 type='email'
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                slotProps={{ htmlInput: { autoComplete: 'email', inputMode: 'email' } }}
               />
               <CustomTextField
                 fullWidth
                 label='Phone Number'
-                placeholder='+977 98XXXXXXXX'
+                placeholder='9812345678 or +9779812345678'
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                slotProps={{ htmlInput: { autoComplete: 'tel', inputMode: 'tel' } }}
+                helperText='10-digit Nepal mobile (starts with 96-99). Country code optional.'
               />
               <CustomTextField
                 fullWidth
                 label='Password'
-                placeholder='Create a password'
+                placeholder='At least 8 chars, 1 upper, 1 lower, 1 number'
                 type={isPasswordShown ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 slotProps={{
+                  htmlInput: { autoComplete: 'new-password' },
                   input: {
                     endAdornment: (
                       <InputAdornment position='end'>
