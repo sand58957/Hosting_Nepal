@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bull';
 
 import { DatabaseModule } from '../../database/database.module';
 import { BlogModule } from '../blog/blog.module';
+import { StorageModule } from '../storage/storage.module';
 import { BLOG_GENERATOR_QUEUE } from './constants';
 import { BlogGeneratorService } from './blog-generator.service';
 import { BlogGeneratorController } from './blog-generator.controller';
@@ -20,6 +21,7 @@ import { TopicPlannerService } from './topic-planner.service';
     ConfigModule,
     DatabaseModule,
     BlogModule,
+    StorageModule,
     BullModule.registerQueue({ name: BLOG_GENERATOR_QUEUE }),
   ],
   controllers: [BlogGeneratorController],

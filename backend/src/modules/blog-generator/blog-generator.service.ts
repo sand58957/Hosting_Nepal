@@ -82,7 +82,7 @@ export class BlogGeneratorService {
         return { status: 'skipped', error: 'slug conflict' };
       }
 
-      const image = await this.imagePicker.pick(post.imageQuery, kernel.category.slug, post.featuredImageAlt);
+      const image = await this.imagePicker.pick(post.imageQuery, kernel.category.slug, post.featuredImageAlt, slug);
       const categoryId = await this.resolveCategoryId(kernel.category.slug);
       const tagIds = await this.resolveTagIds(post.tags);
 

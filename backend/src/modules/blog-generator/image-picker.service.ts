@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { StorageService } from '../storage/storage.service';
+
 export interface PickedImage {
   url: string;
   alt: string;
@@ -23,9 +25,28 @@ const GENERIC_FALLBACK = 'https://images.unsplash.com/photo-1558494949-ef010cbdc
 export class ImagePickerService {
   private readonly logger = new Logger(ImagePickerService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly storage: StorageService,
+  ) {}
 
-  async pick(query: string, categorySlug: string, altFallback: string): Promise<PickedImage> {
+  async pick(query: string, categorySlug: string, altFallback: string, slugForFilename?: string): Promise<PickedImage> {
+    const sourceUrl = await this.sourceUrl(query, categorySlug);
+
+    if (this.storage.isConfigured()) {
+      try {
+        const uploaded = await this.storage.uploadFromUrl(sourceUrl, 'blog/featured', slugForFilename || categorySlug);
+
+        return { url: uploaded.url, alt: altFallback };
+      } catch (err) {
+        this.logger.warn(`R2 mirror failed, falling back to direct URL: ${(err as Error).message}`);
+      }
+    }
+
+    return { url: sourceUrl, alt: altFallback };
+  }
+
+  private async sourceUrl(query: string, categorySlug: string): Promise<string> {
     const accessKey = this.config.get<string>('UNSPLASH_ACCESS_KEY');
 
     if (accessKey) {
@@ -39,9 +60,7 @@ export class ImagePickerService {
           const json: any = await res.json();
           const hit = json?.results?.[0];
 
-          if (hit?.urls?.regular) {
-            return { url: hit.urls.regular, alt: hit.alt_description || altFallback };
-          }
+          if (hit?.urls?.regular) return hit.urls.regular;
         } else {
           this.logger.warn(`Unsplash ${res.status}: ${(await res.text()).slice(0, 200)}`);
         }
@@ -50,8 +69,6 @@ export class ImagePickerService {
       }
     }
 
-    const fallback = FALLBACK_IMAGES[categorySlug] || GENERIC_FALLBACK;
-
-    return { url: fallback, alt: altFallback };
+    return FALLBACK_IMAGES[categorySlug] || GENERIC_FALLBACK;
   }
 }
