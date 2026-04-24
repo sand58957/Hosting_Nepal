@@ -19,6 +19,9 @@ export interface GeminiCallOptions {
   maxOutputTokens?: number;
 }
 
+const BACKOFF_MS = [2000, 8000, 20000];
+const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
+
 @Injectable()
 export class GeminiClientService {
   private readonly logger = new Logger(GeminiClientService.name);
@@ -30,7 +33,39 @@ export class GeminiClientService {
 
     if (!apiKey) throw new ServiceUnavailableException('GEMINI_API_KEY is not set');
 
-    const model = opts.model || this.config.get<string>('BLOG_AUTOGEN_MODEL') || DEFAULT_MODEL;
+    const primaryModel = opts.model || this.config.get<string>('BLOG_AUTOGEN_MODEL') || DEFAULT_MODEL;
+    const modelChain = primaryModel === FALLBACK_MODEL ? [primaryModel] : [primaryModel, FALLBACK_MODEL];
+
+    let lastErr: Error = new Error('no attempt made');
+
+    for (const model of modelChain) {
+      for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
+        try {
+          return await this.callOnce<T>(apiKey, model, opts);
+        } catch (err) {
+          lastErr = err as Error;
+
+          const transient = lastErr.message.includes('503') || lastErr.message.includes('429') || lastErr.message.includes('500') || lastErr.message.includes('UNAVAILABLE');
+
+          if (!transient) throw err;
+
+          if (attempt < BACKOFF_MS.length) {
+            const delay = BACKOFF_MS[attempt];
+
+            this.logger.warn(`Gemini ${model} attempt ${attempt + 1} failed (${lastErr.message}), retrying in ${delay}ms`);
+            await new Promise(r => setTimeout(r, delay));
+          } else {
+            this.logger.warn(`Gemini ${model} exhausted retries, will try next model in chain`);
+            break;
+          }
+        }
+      }
+    }
+
+    throw lastErr;
+  }
+
+  private async callOnce<T>(apiKey: string, model: string, opts: GeminiCallOptions): Promise<GeminiResult<T>> {
     const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const body = {
@@ -60,14 +95,11 @@ export class GeminiClientService {
     if (!res.ok) {
       const text = await res.text();
 
-      this.logger.warn(`Gemini ${res.status}: ${text.slice(0, 500)}`);
-
-      if (res.status === 429) throw new ServiceUnavailableException('Gemini rate limited');
+      this.logger.warn(`Gemini ${model} ${res.status}: ${text.slice(0, 300)}`);
       throw new BadGatewayException(`Gemini error ${res.status}`);
     }
 
     const json: any = await res.json();
-
     const candidate = json?.candidates?.[0];
 
     if (!candidate) throw new BadGatewayException('Gemini returned no candidates');
