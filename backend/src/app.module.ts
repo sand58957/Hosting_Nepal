@@ -16,6 +16,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { SagaModule } from './modules/saga/saga.module';
 import { ResellerModule } from './modules/reseller/reseller.module';
 import { BlogModule } from './modules/blog/blog.module';
+import { BlogGeneratorModule } from './modules/blog-generator/blog-generator.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 
@@ -93,6 +94,7 @@ import databaseConfig from './config/database.config';
     SagaModule,
     ResellerModule,
     BlogModule,
+    BlogGeneratorModule,
   ],
 })
 export class AppModule {}
