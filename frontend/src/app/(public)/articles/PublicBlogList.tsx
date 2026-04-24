@@ -23,7 +23,8 @@ interface Post {
   id: string; slug: string; title: string; excerpt: string | null
   featuredImage: string | null; status: string; views: number
   readTime: number | null; publishedAt: string | null
-  author: { name: string }; category: { name: string; slug: string } | null
+  author: { name: string; authorSlug?: string | null; avatarUrl?: string | null }
+  category: { name: string; slug: string } | null
   tags: { name: string; slug: string }[]
 }
 
@@ -99,7 +100,7 @@ const PublicBlogList = () => {
             <Grid container spacing={3}>
               {posts.map(post => (
                 <Grid size={{ xs: 12, sm: 6, md: 4 }} key={post.id}>
-                  <Card onClick={() => router.push(`/blog/${post.slug}`)} sx={{
+                  <Card onClick={() => router.push(`/articles/${post.slug}`)} sx={{
                     height: '100%', cursor: 'pointer', borderRadius: 3, bgcolor: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.08)', transition: '0.3s',
                     '&:hover': { transform: 'translateY(-6px)', borderColor: '#28C76F', boxShadow: '0 16px 32px rgba(0,0,0,0.3)' },
@@ -126,7 +127,17 @@ const PublicBlogList = () => {
                       <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.06)' }} />
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)' }}>
-                          {post.author?.name} &bull; {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                          {post.author?.authorSlug ? (
+                            <Box
+                              component='span'
+                              onClick={e => { e.stopPropagation(); router.push(`/authors/${post.author.authorSlug}`) }}
+                              sx={{ cursor: 'pointer', '&:hover': { color: '#28C76F' } }}
+                            >
+                              {post.author.name}
+                            </Box>
+                          ) : (
+                            post.author?.name
+                          )} &bull; {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
                         </Typography>
                         <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)' }}>
                           {post.views > 0 ? `${post.views} views` : ''}

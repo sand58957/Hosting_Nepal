@@ -307,6 +307,10 @@ model User {
   verificationTokenExpiry     DateTime?    @map("verification_token_expiry")
   resetPasswordToken          String?      @map("reset_password_token") @db.VarChar(255)
   resetPasswordTokenExpiry    DateTime?    @map("reset_password_token_expiry")
+  authorSlug                  String?      @unique @map("author_slug") @db.VarChar(100)
+  authorTitle                 String?      @map("author_title") @db.VarChar(255)
+  authorBio                   String?      @map("author_bio") @db.Text
+  avatarUrl                   String?      @map("avatar_url") @db.VarChar(500)
   createdAt                   DateTime     @default(now()) @map("created_at")
   updatedAt                   DateTime     @updatedAt @map("updated_at")
 
@@ -327,6 +331,7 @@ model User {
   @@index([email])
   @@index([rcCustomerId])
   @@index([status])
+  @@index([authorSlug])
   @@map("users")
 }
 

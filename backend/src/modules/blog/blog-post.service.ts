@@ -8,7 +8,7 @@ import { BlogQueryDto } from './dto/blog-query.dto';
 import { generateSlug, generateUniqueSlug, calculateReadTime } from './utils/slug.util';
 
 const BLOG_POST_INCLUDE = {
-  author: { select: { id: true, name: true, email: true } },
+  author: { select: { id: true, name: true, email: true, authorSlug: true, authorTitle: true, authorBio: true, avatarUrl: true } },
   category: { select: { id: true, name: true, slug: true } },
   postTags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
 } as const;
@@ -364,11 +364,45 @@ export class BlogPostService {
     ]);
 
     const totalViews = totalViewsResult._sum.views || 0;
-    const avgViews = publishedPosts > 0 ? Math.round(totalViews / publishedPosts) : 0;
+    const avgViews = publishedPosts > 0 ? Math.round((totalViews / publishedPosts) * 10) / 10 : 0;
+
+    const authorGroups = await this.prisma.blogPost.groupBy({
+      by: ['authorId'],
+      where,
+      _count: { _all: true },
+      _sum: { views: true },
+    });
+
+    const topAuthorGroups = authorGroups.sort((a, b) => b._count._all - a._count._all).slice(0, 5);
+
+    const authorUsers = topAuthorGroups.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: topAuthorGroups.map(g => g.authorId) } },
+          select: { id: true, name: true, authorSlug: true, authorTitle: true, avatarUrl: true },
+        })
+      : [];
+
+    const topAuthors = topAuthorGroups.map(g => {
+      const user = authorUsers.find(u => u.id === g.authorId);
+
+      return {
+        id: g.authorId,
+        name: user?.name || 'Unknown',
+        slug: user?.authorSlug || null,
+        title: user?.authorTitle || null,
+        avatarUrl: user?.avatarUrl || null,
+        postCount: g._count._all,
+        totalViews: g._sum.views || 0,
+      };
+    });
 
     return {
-      overview: { totalPosts, publishedPosts, draftPosts, scheduledPosts, archivedPosts, totalViews, avgViews },
+      overview: {
+        totalPosts, publishedPosts, draftPosts, scheduledPosts, archivedPosts,
+        totalViews, avgViews, totalAuthors: authorGroups.length,
+      },
       topPosts,
+      topAuthors,
       categoryStats: categoryStats.map(c => ({ id: c.id, name: c.name, slug: c.slug, postCount: c.posts.length })),
       recentPosts,
     };

@@ -52,8 +52,10 @@ interface Analytics {
     archivedPosts: number
     totalViews: number
     avgViews: number
+    totalAuthors?: number
   }
   topPosts: { id: string; title: string; slug: string; views: number; publishedAt: string; readTime: number | null }[]
+  topAuthors?: { id: string; name: string; slug: string | null; title: string | null; avatarUrl: string | null; postCount: number; totalViews: number }[]
   categoryStats: { id: string; name: string; slug: string; postCount: number }[]
   recentPosts: { id: string; title: string; status: string; views: number; createdAt: string; publishedAt: string | null }[]
 }
@@ -143,7 +145,8 @@ const BlogPostsPage = () => {
     { label: 'Total Posts', value: analytics.overview.totalPosts, icon: 'tabler-article', color: '#7367F0', bg: 'rgba(115,103,240,0.12)' },
     { label: 'Published', value: analytics.overview.publishedPosts, icon: 'tabler-check', color: '#28C76F', bg: 'rgba(40,199,111,0.12)' },
     { label: 'Total Views', value: analytics.overview.totalViews.toLocaleString(), icon: 'tabler-eye', color: '#00CFE8', bg: 'rgba(0,207,232,0.12)' },
-    { label: 'Avg Views/Post', value: analytics.overview.avgViews.toLocaleString(), icon: 'tabler-chart-bar', color: '#FF9F43', bg: 'rgba(255,159,67,0.12)' },
+    { label: 'Avg Views/Post', value: analytics.overview.avgViews.toLocaleString(undefined, { maximumFractionDigits: 1 }), icon: 'tabler-chart-bar', color: '#FF9F43', bg: 'rgba(255,159,67,0.12)' },
+    { label: 'Authors', value: (analytics.overview.totalAuthors ?? analytics.topAuthors?.length ?? 0).toLocaleString(), icon: 'tabler-users', color: '#EA5455', bg: 'rgba(234,84,85,0.12)' },
   ] : []
 
   return (
@@ -259,6 +262,66 @@ const BlogPostsPage = () => {
                         )
                       })}
                   </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Top Authors */}
+          <Grid size={{ xs: 12 }}>
+            <Card>
+              <CardHeader title='Top Authors' titleTypographyProps={{ variant: 'h6' }} />
+              <CardContent sx={{ pt: 0 }}>
+                {!analytics.topAuthors || analytics.topAuthors.length === 0 ? (
+                  <Typography variant='body2' color='text.secondary'>No authors yet</Typography>
+                ) : (
+                  <TableContainer>
+                    <Table size='small'>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Author</TableCell>
+                          <TableCell align='right'>Posts</TableCell>
+                          <TableCell align='right'>Total Views</TableCell>
+                          <TableCell align='right'>Avg Views/Post</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {analytics.topAuthors.map(author => {
+                          const avg = author.postCount ? Math.round((author.totalViews / author.postCount) * 10) / 10 : 0
+
+                          return (
+                            <TableRow
+                              key={author.id}
+                              hover
+                              sx={{ cursor: author.slug ? 'pointer' : 'default' }}
+                              onClick={() => author.slug && window.open(`/authors/${author.slug}`, '_blank')}
+                            >
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                  <Avatar src={author.avatarUrl || undefined} sx={{ width: 32, height: 32, fontSize: 14, bgcolor: '#7367F0' }}>
+                                    {author.name.charAt(0)}
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant='body2' fontWeight={600}>{author.name}</Typography>
+                                    {author.title && <Typography variant='caption' color='text.secondary'>{author.title}</Typography>}
+                                  </Box>
+                                </Box>
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body2' fontWeight={600}>{author.postCount.toLocaleString()}</Typography>
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body2'>{author.totalViews.toLocaleString()}</Typography>
+                              </TableCell>
+                              <TableCell align='right'>
+                                <Typography variant='body2' color='text.secondary'>{avg.toLocaleString(undefined, { maximumFractionDigits: 1 })}</Typography>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
               </CardContent>
             </Card>

@@ -25,7 +25,11 @@ interface Post {
   featuredImage: string | null; views: number; readTime: number | null
   publishedAt: string | null; updatedAt: string; seoTitle: string | null
   seoDescription: string | null; ogImage: string | null
-  author: { name: string; email: string }
+  author: {
+    name: string; email: string;
+    authorSlug?: string | null; authorTitle?: string | null;
+    authorBio?: string | null; avatarUrl?: string | null;
+  }
   category: { name: string; slug: string } | null
   tags: { name: string; slug: string }[]
   jsonLd: Record<string, any> | Record<string, any>[]
@@ -243,13 +247,19 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
 
           {/* Author + Share Row */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar sx={{ width: 44, height: 44, bgcolor: '#28C76F', fontSize: 16, fontWeight: 700 }}>
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: post.author.authorSlug ? 'pointer' : 'default' }}
+              onClick={() => post.author.authorSlug && router.push(`/authors/${post.author.authorSlug}`)}
+            >
+              <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 44, height: 44, bgcolor: '#28C76F', fontSize: 16, fontWeight: 700 }}>
                 {post.author.name.charAt(0)}
               </Avatar>
               <Box>
-                <Typography variant='body2' sx={{ color: '#fff', fontWeight: 600 }}>{post.author.name}</Typography>
+                <Typography variant='body2' sx={{ color: '#fff', fontWeight: 600, '&:hover': { color: post.author.authorSlug ? '#28C76F' : '#fff' } }}>
+                  {post.author.name}
+                </Typography>
                 <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                  {post.author.authorTitle ? `${post.author.authorTitle} · ` : ''}
                   {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
                   {post.updatedAt && post.updatedAt !== post.publishedAt ? ` | Updated ${new Date(post.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
                   {post.views > 0 ? ` | ${post.views.toLocaleString()} views` : ''}
@@ -327,16 +337,31 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
 
             {/* Author Card */}
             <Card sx={{ mt: 5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3 }}>
-              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2.5, p: 3 }}>
-                <Avatar sx={{ width: 64, height: 64, bgcolor: '#28C76F', fontSize: 24, fontWeight: 700 }}>
+              <CardContent sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, p: 3, flexWrap: 'wrap' }}>
+                <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 64, height: 64, bgcolor: '#28C76F', fontSize: 24, fontWeight: 700 }}>
                   {post.author.name.charAt(0)}
                 </Avatar>
-                <Box sx={{ flex: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 240 }}>
                   <Typography variant='overline' sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5 }}>Written by</Typography>
                   <Typography variant='h6' fontWeight={700} sx={{ color: '#fff' }}>{post.author.name}</Typography>
-                  <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>
-                    Hosting Nepal Team
+                  {post.author.authorTitle && (
+                    <Typography variant='caption' sx={{ color: '#28C76F', fontWeight: 600, display: 'block', mt: 0.25 }}>
+                      {post.author.authorTitle}
+                    </Typography>
+                  )}
+                  <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.5)', mt: 1, lineHeight: 1.7 }}>
+                    {post.author.authorBio || 'Part of the Hosting Nepal editorial team covering web hosting, domains, VPS, and local payment workflows for Nepali businesses.'}
                   </Typography>
+                  {post.author.authorSlug && (
+                    <Button
+                      size='small'
+                      variant='outlined'
+                      onClick={() => router.push(`/authors/${post.author.authorSlug}`)}
+                      sx={{ mt: 2, color: '#fff', borderColor: 'rgba(255,255,255,0.15)', textTransform: 'none', borderRadius: 2, '&:hover': { borderColor: '#28C76F', color: '#28C76F' } }}
+                    >
+                      View author profile
+                    </Button>
+                  )}
                 </Box>
               </CardContent>
             </Card>

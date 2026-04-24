@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1 },
     { url: `${baseUrl}/home`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
     { url: `${baseUrl}/articles`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${baseUrl}/authors`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${baseUrl}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${baseUrl}/contact`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
@@ -56,7 +57,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }))
 
-    return [...staticPages, ...blogPages]
+    let authorPages: MetadataRoute.Sitemap = []
+
+    try {
+      const authorRes = await fetch(`${API_URL}/blog/authors`, { cache: 'no-store' })
+      const authorJson = await authorRes.json()
+      const authors: any[] = authorJson?.data || []
+
+      authorPages = authors
+        .filter(a => a?.slug)
+        .map(a => ({
+          url: `${baseUrl}/authors/${a.slug}`,
+          lastModified: now,
+          changeFrequency: 'weekly' as const,
+          priority: 0.5,
+        }))
+    } catch {}
+
+    return [...staticPages, ...blogPages, ...authorPages]
   } catch {
     return staticPages
   }

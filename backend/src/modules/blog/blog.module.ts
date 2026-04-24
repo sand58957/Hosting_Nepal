@@ -11,6 +11,8 @@ import { BlogTagService } from './blog-tag.service';
 import { BlogSeoController } from './blog-seo.controller';
 import { BlogAiController } from './blog-ai.controller';
 import { BlogAiService } from './blog-ai.service';
+import { BlogAuthorController } from './blog-author.controller';
+import { BlogAuthorService } from './blog-author.service';
 
 @Module({
   imports: [ConfigModule],
@@ -20,14 +22,16 @@ import { BlogAiService } from './blog-ai.service';
     BlogTagController,
     BlogSeoController,
     BlogAiController,
+    BlogAuthorController,
   ],
   providers: [
     BlogPostService,
     BlogCategoryService,
     BlogTagService,
     BlogAiService,
+    BlogAuthorService,
     PrismaService,
   ],
-  exports: [BlogPostService, BlogCategoryService, BlogTagService],
+  exports: [BlogPostService, BlogCategoryService, BlogTagService, BlogAuthorService],
 })
 export class BlogModule {}
