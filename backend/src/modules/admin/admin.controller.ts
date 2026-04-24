@@ -28,10 +28,14 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreatePromoCodeDto } from './dto/create-promo-code.dto';
 import { BroadcastNotificationDto } from './dto/broadcast-notification.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('ADMIN', 'SUPER_ADMIN')
 @Controller('admin')
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
@@ -62,6 +66,17 @@ export class AdminController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getAllUsers(@Query() query: AdminQueryDto) {
     return this.adminService.getAllUsers(query);
+  }
+
+  @Post('users')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Create a user (admin bypass of public registration)' })
+  @ApiResponse({ status: 201, description: 'User created' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  async createUser(@Body() dto: CreateUserDto) {
+    this.logger.log(`Admin creating user ${dto.email} with role ${dto.role || 'CUSTOMER'}`);
+    return this.adminService.createUser(dto);
   }
 
   @Get('users/:id')

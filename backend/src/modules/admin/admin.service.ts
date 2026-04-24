@@ -3,9 +3,11 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
 import {
   UserRole,
@@ -22,6 +24,7 @@ import {
 import { AdminQueryDto } from './dto/admin-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { CreatePromoCodeDto } from './dto/create-promo-code.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 
 export interface RevenueDataPoint {
   period: string;
@@ -290,6 +293,45 @@ export class AdminService {
     if (!user) {
       throw new NotFoundException(`User with id "${id}" not found`);
     }
+
+    return user;
+  }
+
+  async createUser(dto: CreateUserDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+      select: { id: true },
+    });
+
+    if (existing) throw new ConflictException('A user with this email already exists');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email.toLowerCase(),
+        name: dto.name,
+        phone: dto.phone,
+        passwordHash,
+        role: dto.role ?? UserRole.CUSTOMER,
+        status: dto.status ?? UserStatus.ACTIVE,
+        companyName: dto.companyName,
+        emailVerified: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        status: true,
+        companyName: true,
+        emailVerified: true,
+        createdAt: true,
+      },
+    });
+
+    this.logger.log(`Admin created user ${user.email} with role ${user.role}`);
 
     return user;
   }

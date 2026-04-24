@@ -88,6 +88,14 @@ const UsersPage = () => {
   const [dialogValue, setDialogValue] = useState('')
   const [dialogSaving, setDialogSaving] = useState(false)
 
+  // Create user dialog state
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createSaving, setCreateSaving] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createShowPassword, setCreateShowPassword] = useState(false)
+  const emptyCreate = { name: '', email: '', phone: '', password: '', role: 'CUSTOMER', status: 'ACTIVE', companyName: '' }
+  const [createForm, setCreateForm] = useState(emptyCreate)
+
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
@@ -136,6 +144,52 @@ const UsersPage = () => {
       setErrorMsg('Failed to update user')
       setTimeout(() => setErrorMsg(null), 4000)
     } finally { setDialogSaving(false) }
+  }
+
+  const resetCreateForm = () => {
+    setCreateForm(emptyCreate)
+    setCreateError(null)
+    setCreateShowPassword(false)
+  }
+
+  const handleCreate = async () => {
+    setCreateError(null)
+    const { name, email, password } = createForm
+
+    if (name.trim().length < 2) return setCreateError('Name must be at least 2 characters')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setCreateError('Please enter a valid email')
+    if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+      return setCreateError('Password must be 8+ chars with upper, lower, and a number')
+    }
+
+    setCreateSaving(true)
+    try {
+      const payload: Record<string, any> = {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        role: createForm.role,
+        status: createForm.status,
+      }
+
+      if (createForm.phone.trim()) payload.phone = createForm.phone.replace(/[\s\-()]/g, '')
+      if (createForm.companyName.trim()) payload.companyName = createForm.companyName.trim()
+
+      await api.post('/admin/users', payload)
+      setSuccessMsg(`User ${payload.email} created as ${payload.role}`)
+      setTimeout(() => setSuccessMsg(null), 3500)
+      setCreateOpen(false)
+      resetCreateForm()
+      fetchUsers()
+      api.get('/admin/users-analytics').then(res => setAnalytics(res.data?.data ?? res.data)).catch(() => {})
+    } catch (err: any) {
+      const apiMsg = err?.response?.data?.message
+      const msg = Array.isArray(apiMsg) ? apiMsg.join(', ') : apiMsg
+
+      setCreateError(msg || 'Failed to create user')
+    } finally {
+      setCreateSaving(false)
+    }
   }
 
   const statCards = analytics ? [
@@ -248,7 +302,18 @@ const UsersPage = () => {
       {/* Users Table */}
       <Grid size={{ xs: 12 }}>
         <Card>
-          <CardHeader title='User Management' />
+          <CardHeader
+            title='User Management'
+            action={
+              <Button
+                variant='contained'
+                startIcon={<i className='tabler-user-plus' />}
+                onClick={() => { resetCreateForm(); setCreateOpen(true) }}
+              >
+                Create User
+              </Button>
+            }
+          />
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
               <Tabs value={roleTab} onChange={(_, v) => { setRoleTab(v); setPage(0) }}
@@ -349,6 +414,87 @@ const UsersPage = () => {
           </CardContent>
         </Card>
       </Grid>
+
+      {/* Create User Dialog */}
+      <Dialog open={createOpen} onClose={() => !createSaving && setCreateOpen(false)} maxWidth='sm' fullWidth>
+        <DialogTitle>Create New User</DialogTitle>
+        <DialogContent>
+          <Typography variant='body2' color='text.secondary' sx={{ mb: 3, mt: 0.5 }}>
+            Users created here are active immediately and their email is marked as verified.
+          </Typography>
+          {createError && (
+            <Alert severity='error' sx={{ mb: 2 }} onClose={() => setCreateError(null)}>{createError}</Alert>
+          )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <CustomTextField
+              fullWidth required label='Full Name' placeholder='Jane Doe'
+              value={createForm.name}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, name: e.target.value }))}
+              slotProps={{ htmlInput: { autoComplete: 'name' } }}
+            />
+            <CustomTextField
+              fullWidth required type='email' label='Email' placeholder='jane@example.com'
+              value={createForm.email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, email: e.target.value }))}
+              slotProps={{ htmlInput: { autoComplete: 'email', inputMode: 'email' } }}
+            />
+            <CustomTextField
+              fullWidth label='Phone Number (optional)' placeholder='9812345678 or +9779812345678'
+              value={createForm.phone}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, phone: e.target.value }))}
+              helperText='10-digit Nepal mobile (starts with 96-99). Country code optional.'
+              slotProps={{ htmlInput: { autoComplete: 'tel', inputMode: 'tel' } }}
+            />
+            <CustomTextField
+              fullWidth required label='Password' placeholder='At least 8 chars, 1 upper, 1 lower, 1 number'
+              type={createShowPassword ? 'text' : 'password'}
+              value={createForm.password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, password: e.target.value }))}
+              slotProps={{
+                htmlInput: { autoComplete: 'new-password' },
+                input: {
+                  endAdornment: (
+                    <IconButton size='small' onClick={() => setCreateShowPassword(s => !s)} onMouseDown={e => e.preventDefault()} edge='end'>
+                      <i className={createShowPassword ? 'tabler-eye-off' : 'tabler-eye'} style={{ fontSize: 18 }} />
+                    </IconButton>
+                  ),
+                },
+              }}
+            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <CustomTextField
+                select fullWidth label='Role'
+                value={createForm.role}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, role: e.target.value }))}
+              >
+                {['CUSTOMER', 'RESELLER', 'SUPPORT_AGENT', 'ADMIN', 'SUPER_ADMIN'].map(r => (
+                  <MenuItem key={r} value={r}>{r.replace('_', ' ')}</MenuItem>
+                ))}
+              </CustomTextField>
+              <CustomTextField
+                select fullWidth label='Status'
+                value={createForm.status}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, status: e.target.value }))}
+              >
+                {['ACTIVE', 'PENDING_VERIFICATION', 'INACTIVE', 'SUSPENDED'].map(s => (
+                  <MenuItem key={s} value={s}>{s.replace('_', ' ')}</MenuItem>
+                ))}
+              </CustomTextField>
+            </Box>
+            <CustomTextField
+              fullWidth label='Company Name (optional)'
+              value={createForm.companyName}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateForm(f => ({ ...f, companyName: e.target.value }))}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)} color='inherit' disabled={createSaving}>Cancel</Button>
+          <Button onClick={handleCreate} variant='contained' disabled={createSaving} startIcon={<i className='tabler-user-plus' />}>
+            {createSaving ? 'Creating...' : 'Create User'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Role/Status Dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth='xs' fullWidth>
