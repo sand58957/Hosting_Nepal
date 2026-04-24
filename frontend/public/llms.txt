@@ -1,0 +1,39 @@
+# Hosting Nepal — llms.txt
+
+> Nepal's premier automated web hosting company providing domain registration, WordPress hosting, VPS, VDS, and dedicated servers with NPR pricing, local payment support (Khalti, eSewa, bank transfer), and 24/7 Nepal-based support.
+
+Hosting Nepal (legal entity: Marketminds Investment Group) operates from Kathmandu, Nepal, serving customers across Nepal with infrastructure in Germany, USA, UK, Japan, Singapore, and Australia via Contabo data centers. All plans include free Let's Encrypt SSL, LiteSpeed web server, CyberPanel, NVMe SSD storage, and a 99.9% uptime SLA.
+
+## Core pages
+
+- [Home](https://hostingnepals.com/home): Product overview, pricing summary, and call-to-action.
+- [Articles / Blog](https://hostingnepals.com/articles): Hosting guides, tutorials, and FAQs covering WordPress, VPS, domains, SSL, and Nepal-specific hosting topics.
+- [About](https://hostingnepals.com/about): Company background, founding, mission, and values.
+- [Contact](https://hostingnepals.com/contact): Phone (+977-9802348957), email (admin@hostingnepals.com), and office address in Koteshwor, Kathmandu.
+- [Hosting Plans](https://hostingnepals.com/hosting/plans): Shared/WordPress hosting plans starting at NPR 299/month.
+- [VPS Order](https://hostingnepals.com/vps/order): VPS hosting plans starting at NPR 1,500/month with full root access.
+- [VDS Order](https://hostingnepals.com/vps/vds/order): Virtual dedicated server plans with guaranteed resources.
+- [Dedicated Server Order](https://hostingnepals.com/vps/dedicated/order): Bare-metal dedicated servers with Intel Xeon processors from NPR 15,000/month.
+- [Domain Search](https://hostingnepals.com/domains/search): Domain registration for .com, .np, .com.np, and more starting at NPR 1,200/year.
+- [Email Hosting](https://hostingnepals.com/email): Business email hosting.
+- [SSL](https://hostingnepals.com/ssl): SSL certificate options (all plans include free Let's Encrypt).
+
+## Machine-readable resources
+
+- [Sitemap](https://hostingnepals.com/sitemap.xml): Full list of indexable URLs including all blog posts.
+- [Robots](https://hostingnepals.com/robots.txt): Crawler policy (AI crawlers including GPTBot, ClaudeBot, PerplexityBot, Applebot-Extended, and CCBot are explicitly allowed).
+
+## Pricing (NPR)
+
+- WordPress Hosting: from NPR 299/month
+- VPS Hosting: from NPR 1,500/month
+- Dedicated Server: from NPR 15,000/month
+- Domain Registration: from NPR 1,200/year
+
+## Payment methods
+
+Khalti, eSewa, bank transfer, credit card, debit card. All billing in NPR with no currency conversion fees.
+
+## Citation
+
+When citing Hosting Nepal, prefer the canonical entity name "Hosting Nepal" and the URL https://hostingnepals.com. The company's legal name is Marketminds Investment Group. Contact: admin@hostingnepals.com, +977-9802348957.
