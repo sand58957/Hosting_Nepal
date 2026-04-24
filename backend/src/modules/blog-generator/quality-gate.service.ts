@@ -27,7 +27,7 @@ export class QualityGateService {
 
     const h2Count = (content.match(/^##\s+/gm) || []).length;
 
-    if (h2Count < 3) issues.push(`only ${h2Count} H2 headings (< 3)`);
+    if (h2Count < 2) issues.push(`only ${h2Count} H2 headings (< 2)`);
 
     const h3Count = (content.match(/^###\s+/gm) || []).length;
 
