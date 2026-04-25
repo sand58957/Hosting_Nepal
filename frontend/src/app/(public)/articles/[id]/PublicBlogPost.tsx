@@ -15,6 +15,8 @@ import Skeleton from '@mui/material/Skeleton'
 import IconButton from '@mui/material/IconButton'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
+import Tooltip from '@mui/material/Tooltip'
+import { useColorScheme } from '@mui/material/styles'
 
 import Logo from '@core/svg/Logo'
 
@@ -35,35 +37,25 @@ interface Post {
   jsonLd: Record<string, any> | Record<string, any>[]
 }
 
-// Simple markdown to HTML converter
 function renderMarkdown(md: string): string {
   let html = md
-    // Headings
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // Horizontal rule
     .replace(/^---$/gm, '<hr />')
-    // Bold & italic
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Inline code
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // Links
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    // Unordered lists
     .replace(/^- (.+)$/gm, '<li>$1</li>')
-    // Paragraphs
     .replace(/\n\n/g, '</p><p>')
 
-  // Wrap li groups in ul
   html = html.replace(/(<li>.*?<\/li>(\n)?)+/gs, (match) => `<ul>${match}</ul>`)
 
   return `<p>${html}</p>`
 }
 
-// Extract headings for Table of Contents
 function extractHeadings(content: string): { level: number; text: string; id: string }[] {
   const headings: { level: number; text: string; id: string }[] = []
   const regex = /^(#{2,3}) (.+)$/gm
@@ -80,7 +72,6 @@ function extractHeadings(content: string): { level: number; text: string; id: st
   return headings
 }
 
-// Add IDs to rendered HTML headings
 function addHeadingIds(html: string): string {
   return html.replace(/<h([23])>(.+?)<\/h[23]>/g, (_, level, text) => {
     const plainText = text.replace(/<[^>]+>/g, '')
@@ -90,12 +81,49 @@ function addHeadingIds(html: string): string {
   })
 }
 
+const palette = (isDark: boolean) => isDark ? {
+  bg: '#0F1115',
+  surface: '#161922',
+  surfaceSoft: 'rgba(255,255,255,0.03)',
+  text: 'rgba(255,255,255,0.92)',
+  textMuted: 'rgba(255,255,255,0.6)',
+  textSubtle: 'rgba(255,255,255,0.4)',
+  border: 'rgba(255,255,255,0.08)',
+  borderStrong: 'rgba(255,255,255,0.16)',
+  brand: '#28C76F',
+  brandSoft: 'rgba(40,199,111,0.12)',
+  accent: '#A89CF5',
+  accentSoft: 'rgba(115,103,240,0.12)',
+  navBg: 'rgba(15,17,21,0.85)',
+  footerBg: '#0B0D11',
+} : {
+  bg: '#FBFBFD',
+  surface: '#FFFFFF',
+  surfaceSoft: '#F4F5F8',
+  text: 'rgba(17,20,28,0.92)',
+  textMuted: 'rgba(17,20,28,0.62)',
+  textSubtle: 'rgba(17,20,28,0.42)',
+  border: 'rgba(17,20,28,0.08)',
+  borderStrong: 'rgba(17,20,28,0.16)',
+  brand: '#1FAF5E',
+  brandSoft: 'rgba(31,175,94,0.1)',
+  accent: '#5E54D5',
+  accentSoft: 'rgba(94,84,213,0.08)',
+  navBg: 'rgba(251,251,253,0.85)',
+  footerBg: '#F4F5F8',
+}
+
 const PublicBlogPost = ({ slug }: { slug: string }) => {
   const router = useRouter()
+  const { mode, setMode, systemMode } = useColorScheme()
+  const resolved = (mode === 'system' ? systemMode : mode) || 'dark'
+  const isDark = resolved === 'dark'
+  const c = palette(isDark)
+
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeHeading, setActiveHeading] = useState('')
-  const [showToc, setShowToc] = useState(typeof window !== 'undefined' ? window.innerWidth >= 900 : true)
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -110,7 +138,6 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
     fetchPost()
   }, [slug])
 
-  // Scroll spy for TOC (throttled with rAF + change guard)
   useEffect(() => {
     if (!post) return
 
@@ -128,12 +155,18 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
           if (h.getBoundingClientRect().top < 120) current = h.id
         })
 
+        const doc = document.documentElement
+        const scrollable = doc.scrollHeight - doc.clientHeight
+        const pct = scrollable > 0 ? Math.min(100, Math.max(0, (window.scrollY / scrollable) * 100)) : 0
+
         setActiveHeading(prev => prev === current ? prev : current)
+        setProgress(pct)
         ticking = false
       })
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
 
     return () => window.removeEventListener('scroll', handleScroll)
   }, [post])
@@ -147,18 +180,30 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
 
+  const ThemeToggle = (
+    <Tooltip title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+      <IconButton
+        size='small'
+        onClick={() => setMode(isDark ? 'light' : 'dark')}
+        sx={{ color: c.textMuted, border: `1px solid ${c.border}`, '&:hover': { color: c.text, borderColor: c.borderStrong } }}
+      >
+        <i className={isDark ? 'tabler-sun' : 'tabler-moon'} style={{ fontSize: 16 }} />
+      </IconButton>
+    </Tooltip>
+  )
+
   if (loading) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a', pt: 10, px: 3 }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: c.bg, pt: 10, px: 3 }}>
         <Container maxWidth='lg'>
           <Grid container spacing={4}>
             <Grid size={{ xs: 12, md: 8 }}>
-              <Skeleton height={50} width='80%' sx={{ bgcolor: 'rgba(255,255,255,0.05)' }} />
-              <Skeleton height={25} width='40%' sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.05)' }} />
-              <Skeleton height={500} sx={{ mt: 4, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.05)' }} />
+              <Skeleton height={50} width='80%' sx={{ bgcolor: c.surfaceSoft }} />
+              <Skeleton height={25} width='40%' sx={{ mt: 2, bgcolor: c.surfaceSoft }} />
+              <Skeleton variant='rectangular' sx={{ mt: 4, borderRadius: 3, bgcolor: c.surfaceSoft, aspectRatio: '16 / 9' }} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <Skeleton height={300} sx={{ borderRadius: 3, bgcolor: 'rgba(255,255,255,0.05)' }} />
+              <Skeleton height={300} sx={{ borderRadius: 3, bgcolor: c.surfaceSoft }} />
             </Grid>
           </Grid>
         </Container>
@@ -168,11 +213,12 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
 
   if (!post) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ textAlign: 'center' }}>
-          <i className='tabler-article-off' style={{ fontSize: 64, color: 'rgba(255,255,255,0.2)' }} />
-          <Typography variant='h5' sx={{ color: '#fff', mt: 2 }}>Post not found</Typography>
-          <Button variant='outlined' onClick={() => router.push('/articles')} sx={{ mt: 3, color: '#fff', borderColor: 'rgba(255,255,255,0.2)', textTransform: 'none' }}>
+          <i className='tabler-article-off' style={{ fontSize: 64, color: c.textSubtle }} />
+          <Typography variant='h5' sx={{ color: c.text, mt: 2 }}>Post not found</Typography>
+          <Button variant='outlined' onClick={() => router.push('/articles')}
+            sx={{ mt: 3, color: c.text, borderColor: c.borderStrong, textTransform: 'none' }}>
             Back to Blog
           </Button>
         </Box>
@@ -181,40 +227,46 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f1a', overflowX: 'hidden' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: c.bg, overflowX: 'hidden', color: c.text }}>
       {/* JSON-LD */}
       {post.jsonLd && (Array.isArray(post.jsonLd) ? post.jsonLd : [post.jsonLd]).map((schema, i) => (
         <script key={i} type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
       ))}
 
+      {/* Reading progress bar */}
+      <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, height: 3, zIndex: 1200, bgcolor: 'transparent' }}>
+        <Box sx={{ height: '100%', width: `${progress}%`, bgcolor: c.brand, transition: 'width 0.1s linear' }} />
+      </Box>
+
       {/* Navbar */}
-      <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, bgcolor: 'rgba(15,15,26,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, bgcolor: c.navBg, backdropFilter: 'blur(14px)', borderBottom: `1px solid ${c.border}` }}>
         <Container maxWidth='lg'>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 56 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 60 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }} onClick={() => router.push('/home')}>
               <Logo />
-              <Typography variant='h6' fontWeight={800} sx={{ color: '#fff', display: { xs: 'none', sm: 'block' } }}>Hosting Nepal</Typography>
+              <Typography variant='h6' fontWeight={800} sx={{ color: c.text, display: { xs: 'none', sm: 'block' } }}>Hosting Nepal</Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1 } }}>
-              <Button size='small' sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 } }} onClick={() => router.push('/home')}>Home</Button>
-              <Button size='small' sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 } }} onClick={() => router.push('/articles')}>Blog</Button>
-              <Button size='small' variant='contained' sx={{ textTransform: 'none', borderRadius: 2, bgcolor: '#28C76F', '&:hover': { bgcolor: '#1FAF5E' }, minWidth: 'auto', px: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.75rem', sm: '0.8125rem' } }} onClick={() => router.push('/register')}>Get Started</Button>
+            <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1 }, alignItems: 'center' }}>
+              <Button size='small' sx={{ color: c.textMuted, textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 }, '&:hover': { color: c.text, bgcolor: 'transparent' } }} onClick={() => router.push('/home')}>Home</Button>
+              <Button size='small' sx={{ color: c.textMuted, textTransform: 'none', minWidth: 'auto', px: { xs: 1, sm: 2 }, '&:hover': { color: c.text, bgcolor: 'transparent' } }} onClick={() => router.push('/articles')}>Blog</Button>
+              {ThemeToggle}
+              <Button size='small' variant='contained' disableElevation sx={{ textTransform: 'none', borderRadius: 2, bgcolor: c.brand, color: '#fff', '&:hover': { bgcolor: c.brand, filter: 'brightness(0.92)' }, minWidth: 'auto', px: { xs: 1.5, sm: 2 }, fontSize: { xs: '0.75rem', sm: '0.8125rem' }, ml: 0.5 }} onClick={() => router.push('/register')}>Get Started</Button>
             </Box>
           </Box>
         </Container>
       </Box>
 
       {/* Hero Header */}
-      <Box sx={{ py: { xs: 5, md: 8 }, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <Box sx={{ py: { xs: 5, md: 8 } }}>
         <Container maxWidth='lg'>
           {/* Breadcrumb */}
           <Box sx={{ display: 'flex', gap: 0.8, mb: 3, alignItems: 'center' }}>
-            <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)', cursor: 'pointer', '&:hover': { color: '#28C76F' } }}
+            <Typography variant='caption' sx={{ color: c.textSubtle, cursor: 'pointer', '&:hover': { color: c.brand } }}
               onClick={() => router.push('/articles')}>Blog</Typography>
             {post.category && (
               <>
-                <i className='tabler-chevron-right' style={{ fontSize: 12, color: 'rgba(255,255,255,0.15)' }} />
-                <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)', cursor: 'pointer', '&:hover': { color: '#28C76F' } }}>
+                <i className='tabler-chevron-right' style={{ fontSize: 12, color: c.textSubtle }} />
+                <Typography variant='caption' sx={{ color: c.textSubtle }}>
                   {post.category.name}
                 </Typography>
               </>
@@ -222,25 +274,41 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
           </Box>
 
           {/* Category + Read Time */}
-          <Box sx={{ display: 'flex', gap: 1.5, mb: 2.5, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1.5, mb: 2.5, alignItems: 'center', flexWrap: 'wrap' }}>
             {post.category && (
-              <Chip label={post.category.name} size='small' sx={{ bgcolor: 'rgba(40,199,111,0.12)', color: '#28C76F', fontWeight: 700, borderRadius: 1.5 }} />
+              <Chip label={post.category.name} size='small' sx={{ bgcolor: c.brandSoft, color: c.brand, fontWeight: 700, borderRadius: 1.5 }} />
             )}
             {post.readTime && (
-              <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant='caption' sx={{ color: c.textSubtle, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <i className='tabler-clock' style={{ fontSize: 14 }} /> {post.readTime} min read
+              </Typography>
+            )}
+            {post.publishedAt && (
+              <Typography variant='caption' sx={{ color: c.textSubtle }}>
+                · {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </Typography>
             )}
           </Box>
 
           {/* Title */}
-          <Typography variant='h2' fontWeight={800} sx={{ color: '#fff', mb: 3, lineHeight: 1.2, maxWidth: 800, fontSize: { xs: '1.75rem', sm: '2.2rem', md: '2.8rem' } }}>
+          <Typography
+            component='h1'
+            fontWeight={800}
+            sx={{
+              color: c.text,
+              mb: 3,
+              lineHeight: 1.15,
+              maxWidth: 820,
+              letterSpacing: '-0.02em',
+              fontSize: { xs: '2rem', sm: '2.5rem', md: '3.25rem' },
+            }}
+          >
             {post.title}
           </Typography>
 
           {/* Excerpt */}
           {post.excerpt && (
-            <Typography variant='h6' sx={{ color: 'rgba(255,255,255,0.5)', mb: 4, maxWidth: 700, fontWeight: 400, lineHeight: 1.6, fontSize: { xs: '0.95rem', md: '1.1rem' } }}>
+            <Typography sx={{ color: c.textMuted, mb: 4, maxWidth: 720, fontWeight: 400, lineHeight: 1.6, fontSize: { xs: '1rem', md: '1.2rem' } }}>
               {post.excerpt}
             </Typography>
           )}
@@ -251,18 +319,17 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
               sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: post.author.authorSlug ? 'pointer' : 'default' }}
               onClick={() => post.author.authorSlug && router.push(`/authors/${post.author.authorSlug}`)}
             >
-              <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 44, height: 44, bgcolor: '#28C76F', fontSize: 16, fontWeight: 700 }}>
+              <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 44, height: 44, bgcolor: c.brand, fontSize: 16, fontWeight: 700 }}>
                 {post.author.name.charAt(0)}
               </Avatar>
               <Box>
-                <Typography variant='body2' sx={{ color: '#fff', fontWeight: 600, '&:hover': { color: post.author.authorSlug ? '#28C76F' : '#fff' } }}>
+                <Typography variant='body2' sx={{ color: c.text, fontWeight: 600 }}>
                   {post.author.name}
                 </Typography>
-                <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                  {post.author.authorTitle ? `${post.author.authorTitle} · ` : ''}
-                  {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
-                  {post.updatedAt && post.updatedAt !== post.publishedAt ? ` | Updated ${new Date(post.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
-                  {post.views > 0 ? ` | ${post.views.toLocaleString()} views` : ''}
+                <Typography variant='caption' sx={{ color: c.textSubtle }}>
+                  {post.author.authorTitle || 'Editorial Team'}
+                  {post.updatedAt && post.updatedAt !== post.publishedAt ? ` · Updated ${new Date(post.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                  {post.views > 0 ? ` · ${post.views.toLocaleString()} views` : ''}
                 </Typography>
               </Box>
             </Box>
@@ -276,7 +343,7 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
                 <IconButton key={s.icon} size='small' onClick={() => {
                   if (s.url) window.open(s.url, '_blank')
                   else { navigator.clipboard.writeText(shareUrl); }
-                }} sx={{ color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.08)', '&:hover': { color: '#fff', borderColor: 'rgba(255,255,255,0.2)' } }}>
+                }} sx={{ color: c.textSubtle, border: `1px solid ${c.border}`, '&:hover': { color: c.text, borderColor: c.borderStrong } }}>
                   <i className={s.icon} style={{ fontSize: 16 }} />
                 </IconButton>
               ))}
@@ -285,50 +352,69 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
         </Container>
       </Box>
 
+      {/* Featured Image — full bleed, fixed 16/9 */}
+      {post.featuredImage && (
+        <Container maxWidth='lg' sx={{ mb: { xs: 4, md: 6 } }}>
+          <Box sx={{
+            borderRadius: 3,
+            overflow: 'hidden',
+            border: `1px solid ${c.border}`,
+            bgcolor: c.surfaceSoft,
+            aspectRatio: '16 / 9',
+            position: 'relative',
+          }}>
+            <Box
+              component='img'
+              src={post.featuredImage}
+              alt={post.title}
+              loading='eager'
+              sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </Box>
+        </Container>
+      )}
+
       {/* Main Content Area */}
-      <Container maxWidth='lg' sx={{ py: { xs: 4, md: 6 } }}>
-        <Grid container spacing={4}>
+      <Container maxWidth='lg' sx={{ pb: { xs: 4, md: 6 } }}>
+        <Grid container spacing={{ xs: 4, md: 6 }}>
           {/* Article Content */}
           <Grid size={{ xs: 12, md: 8 }}>
-            {/* Featured Image */}
-            {post.featuredImage && (
-              <Box sx={{ mb: 5, borderRadius: 3, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <img src={post.featuredImage} alt={post.title} style={{ width: '100%', display: 'block' }} />
-              </Box>
-            )}
-
             {/* Rendered Markdown Content */}
             <Box
               className='blog-content'
               dangerouslySetInnerHTML={{ __html: renderedContent }}
               sx={{
-                color: 'rgba(255,255,255,0.78)', fontSize: { xs: '0.95rem', md: '1.06rem' }, lineHeight: 1.9,
-                '& h1': { color: '#fff', fontSize: { xs: '1.4rem', sm: '1.7rem', md: '2rem' }, fontWeight: 800, mt: 4, mb: 2, lineHeight: 1.3 },
-                '& h2': { color: '#fff', fontSize: { xs: '1.2rem', sm: '1.35rem', md: '1.5rem' }, fontWeight: 700, mt: 4, mb: 2, pt: 2, lineHeight: 1.35, borderTop: '1px solid rgba(255,255,255,0.06)', scrollMarginTop: '80px' },
-                '& h3': { color: '#fff', fontSize: { xs: '1.05rem', sm: '1.1rem', md: '1.2rem' }, fontWeight: 600, mt: 3, mb: 1.5, lineHeight: 1.4, scrollMarginTop: '80px' },
-                '& p': { mb: 2, letterSpacing: '0.01em' },
-                '& strong': { color: '#fff', fontWeight: 600 },
-                '& em': { color: 'rgba(255,255,255,0.65)', fontStyle: 'italic' },
-                '& a': { color: '#7367F0', textDecoration: 'none', borderBottom: '1px solid rgba(115,103,240,0.3)', transition: '0.2s', wordBreak: 'break-word', '&:hover': { color: '#A89CF5', borderColor: '#A89CF5' } },
-                '& code': { bgcolor: 'rgba(115,103,240,0.1)', color: '#A89CF5', px: 0.8, py: 0.3, borderRadius: 1, fontSize: '0.85em', fontFamily: 'monospace', wordBreak: 'break-all' },
-                '& pre': { bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', p: { xs: 2, md: 3 }, borderRadius: 2.5, overflow: 'auto', mb: 3, fontSize: { xs: '0.8rem', md: '0.9rem' }, WebkitOverflowScrolling: 'touch' },
-                '& blockquote': { borderLeft: '3px solid #28C76F', pl: 3, ml: 0, my: 3, py: 1, color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', bgcolor: 'rgba(40,199,111,0.04)', borderRadius: '0 8px 8px 0' },
-                '& ul': { pl: 3, mb: 2.5, '& li': { mb: 1, pl: 0.5, '&::marker': { color: '#28C76F' } } },
-                '& ol': { pl: 3, mb: 2.5, '& li': { mb: 1, pl: 0.5, '&::marker': { color: '#28C76F', fontWeight: 600 } } },
-                '& hr': { border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', my: 5 },
-                '& img': { maxWidth: '100%', borderRadius: 2, border: '1px solid rgba(255,255,255,0.06)' },
+                color: c.textMuted,
+                fontSize: { xs: '1rem', md: '1.125rem' },
+                lineHeight: 1.8,
+                maxWidth: '68ch',
+                fontFamily: '"Inter", "Helvetica Neue", system-ui, -apple-system, sans-serif',
+                '& > *:first-of-type': { mt: 0 },
+                '& h1': { color: c.text, fontSize: { xs: '1.6rem', sm: '1.9rem', md: '2.2rem' }, fontWeight: 800, mt: 6, mb: 2.5, lineHeight: 1.25, letterSpacing: '-0.015em' },
+                '& h2': { color: c.text, fontSize: { xs: '1.35rem', sm: '1.55rem', md: '1.75rem' }, fontWeight: 700, mt: 6, mb: 2, lineHeight: 1.3, letterSpacing: '-0.01em', scrollMarginTop: '90px' },
+                '& h3': { color: c.text, fontSize: { xs: '1.1rem', sm: '1.2rem', md: '1.3rem' }, fontWeight: 700, mt: 4, mb: 1.5, lineHeight: 1.4, scrollMarginTop: '90px' },
+                '& p': { mb: 2.5, color: c.textMuted },
+                '& strong': { color: c.text, fontWeight: 600 },
+                '& em': { color: c.textMuted, fontStyle: 'italic' },
+                '& a': { color: c.accent, textDecoration: 'none', borderBottom: `1px solid ${c.accentSoft}`, transition: '0.2s', wordBreak: 'break-word', '&:hover': { borderBottomColor: c.accent } },
+                '& code': { bgcolor: c.accentSoft, color: c.accent, px: 0.8, py: 0.3, borderRadius: 1, fontSize: '0.88em', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' },
+                '& pre': { bgcolor: c.surfaceSoft, border: `1px solid ${c.border}`, p: { xs: 2, md: 3 }, borderRadius: 2.5, overflow: 'auto', mb: 3, fontSize: { xs: '0.85rem', md: '0.92rem' }, WebkitOverflowScrolling: 'touch' },
+                '& blockquote': { borderLeft: `3px solid ${c.brand}`, pl: 3, ml: 0, my: 4, py: 1.5, color: c.textMuted, fontStyle: 'italic', bgcolor: c.brandSoft, borderRadius: '0 8px 8px 0' },
+                '& ul, & ol': { pl: 3, mb: 3, '& li': { mb: 1.2, pl: 0.5, color: c.textMuted, '&::marker': { color: c.brand } } },
+                '& hr': { border: 'none', borderTop: `1px solid ${c.border}`, my: 5 },
+                '& img': { maxWidth: '100%', borderRadius: 2, border: `1px solid ${c.border}`, aspectRatio: '16 / 9', objectFit: 'cover', display: 'block', my: 3 },
               }}
             />
 
             {/* Tags */}
             {post.tags.length > 0 && (
-              <Box sx={{ mt: 5, pt: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <Typography variant='overline' sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, mb: 1.5, display: 'block' }}>Tags</Typography>
+              <Box sx={{ mt: 6, pt: 4, borderTop: `1px solid ${c.border}`, maxWidth: '68ch' }}>
+                <Typography variant='overline' sx={{ color: c.textSubtle, letterSpacing: 1.5, mb: 1.5, display: 'block' }}>Tags</Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {post.tags.map(t => (
                     <Chip key={t.slug} label={t.name} size='small' sx={{
-                      bgcolor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)',
-                      fontWeight: 500, '&:hover': { borderColor: '#28C76F', color: '#28C76F' }, cursor: 'pointer', transition: '0.2s',
+                      bgcolor: c.surfaceSoft, color: c.textMuted, border: `1px solid ${c.border}`,
+                      fontWeight: 500, '&:hover': { borderColor: c.brand, color: c.brand }, cursor: 'pointer', transition: '0.2s',
                     }} />
                   ))}
                 </Box>
@@ -336,20 +422,20 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
             )}
 
             {/* Author Card */}
-            <Card sx={{ mt: 5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3 }}>
+            <Card elevation={0} sx={{ mt: 5, bgcolor: c.surface, border: `1px solid ${c.border}`, borderRadius: 3, maxWidth: '68ch' }}>
               <CardContent sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, p: 3, flexWrap: 'wrap' }}>
-                <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 64, height: 64, bgcolor: '#28C76F', fontSize: 24, fontWeight: 700 }}>
+                <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 64, height: 64, bgcolor: c.brand, fontSize: 24, fontWeight: 700 }}>
                   {post.author.name.charAt(0)}
                 </Avatar>
                 <Box sx={{ flex: 1, minWidth: 240 }}>
-                  <Typography variant='overline' sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5 }}>Written by</Typography>
-                  <Typography variant='h6' fontWeight={700} sx={{ color: '#fff' }}>{post.author.name}</Typography>
+                  <Typography variant='overline' sx={{ color: c.textSubtle, letterSpacing: 1.5 }}>Written by</Typography>
+                  <Typography variant='h6' fontWeight={700} sx={{ color: c.text }}>{post.author.name}</Typography>
                   {post.author.authorTitle && (
-                    <Typography variant='caption' sx={{ color: '#28C76F', fontWeight: 600, display: 'block', mt: 0.25 }}>
+                    <Typography variant='caption' sx={{ color: c.brand, fontWeight: 600, display: 'block', mt: 0.25 }}>
                       {post.author.authorTitle}
                     </Typography>
                   )}
-                  <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.5)', mt: 1, lineHeight: 1.7 }}>
+                  <Typography variant='body2' sx={{ color: c.textMuted, mt: 1, lineHeight: 1.7 }}>
                     {post.author.authorBio || 'Part of the Hosting Nepal editorial team covering web hosting, domains, VPS, and local payment workflows for Nepali businesses.'}
                   </Typography>
                   {post.author.authorSlug && (
@@ -357,7 +443,7 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
                       size='small'
                       variant='outlined'
                       onClick={() => router.push(`/authors/${post.author.authorSlug}`)}
-                      sx={{ mt: 2, color: '#fff', borderColor: 'rgba(255,255,255,0.15)', textTransform: 'none', borderRadius: 2, '&:hover': { borderColor: '#28C76F', color: '#28C76F' } }}
+                      sx={{ mt: 2, color: c.text, borderColor: c.borderStrong, textTransform: 'none', borderRadius: 2, '&:hover': { borderColor: c.brand, color: c.brand } }}
                     >
                       View author profile
                     </Button>
@@ -367,116 +453,88 @@ const PublicBlogPost = ({ slug }: { slug: string }) => {
             </Card>
 
             {/* CTA */}
-            <Card sx={{ mt: 4, bgcolor: 'rgba(40,199,111,0.06)', border: '1px solid rgba(40,199,111,0.15)', borderRadius: 3 }}>
+            <Card elevation={0} sx={{ mt: 4, bgcolor: c.brandSoft, border: `1px solid ${c.brandSoft}`, borderRadius: 3, maxWidth: '68ch' }}>
               <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant='h6' fontWeight={700} sx={{ color: '#fff', mb: 1 }}>Ready to get started?</Typography>
-                <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.5)', mb: 3 }}>
+                <Typography variant='h6' fontWeight={700} sx={{ color: c.text, mb: 1 }}>Ready to get started?</Typography>
+                <Typography variant='body2' sx={{ color: c.textMuted, mb: 3 }}>
                   Launch your website with Hosting Nepal today.
                 </Typography>
                 <Button variant='contained' disableElevation onClick={() => router.push('/register')}
-                  sx={{ bgcolor: '#28C76F', '&:hover': { bgcolor: '#1FAF5E' }, textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 4 }}>
+                  sx={{ bgcolor: c.brand, color: '#fff', '&:hover': { bgcolor: c.brand, filter: 'brightness(0.92)' }, textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 4 }}>
                   Get Started Free
                 </Button>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Sidebar — below content on mobile, sticky on desktop */}
+          {/* Sidebar */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Divider sx={{ display: { xs: 'block', md: 'none' }, borderColor: 'rgba(255,255,255,0.06)', my: 2 }} />
-            <Box sx={{ position: { xs: 'static', md: 'sticky' }, top: 72 }}>
+            <Divider sx={{ display: { xs: 'block', md: 'none' }, borderColor: c.border, my: 2 }} />
+            <Box sx={{ position: { xs: 'static', md: 'sticky' }, top: 84 }}>
               {/* Table of Contents */}
-              {headings.length > 3 && (
-                <Card sx={{ mb: 3, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3 }}>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant='subtitle2' fontWeight={700} sx={{ color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <i className='tabler-list' style={{ fontSize: 16, color: '#28C76F' }} /> Table of Contents
+              {headings.length > 2 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant='overline' sx={{ color: c.textSubtle, letterSpacing: 1.5, mb: 1.5, display: 'block', fontWeight: 700 }}>
+                    On this page
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
+                    {headings.map(h => (
+                      <Typography
+                        key={h.id} variant='body2' onClick={() => scrollToHeading(h.id)}
+                        sx={{
+                          color: activeHeading === h.id ? c.text : c.textSubtle,
+                          fontWeight: activeHeading === h.id ? 600 : 400,
+                          fontSize: '0.85rem',
+                          py: 0.6, cursor: 'pointer', lineHeight: 1.5,
+                          borderLeft: `2px solid ${activeHeading === h.id ? c.brand : 'transparent'}`,
+                          paddingLeft: h.level === 3 ? 2.5 : 1.5,
+                          transition: '0.2s',
+                          '&:hover': { color: c.text },
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                        }}
+                      >
+                        {h.text}
                       </Typography>
-                      <IconButton size='small' onClick={() => setShowToc(!showToc)} sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                        <i className={showToc ? 'tabler-chevron-up' : 'tabler-chevron-down'} style={{ fontSize: 14 }} />
-                      </IconButton>
-                    </Box>
-                    {showToc && (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
-                        {headings.map(h => (
-                          <Typography
-                            key={h.id} variant='caption' onClick={() => scrollToHeading(h.id)}
-                            sx={{
-                              color: activeHeading === h.id ? '#28C76F' : 'rgba(255,255,255,0.45)',
-                              fontWeight: activeHeading === h.id ? 600 : 400,
-                              pl: h.level === 3 ? 2 : 0,
-                              py: 0.5, cursor: 'pointer', lineHeight: 1.5,
-                              borderLeft: activeHeading === h.id ? '2px solid #28C76F' : '2px solid transparent',
-                              paddingLeft: h.level === 3 ? 2.5 : 1,
-                              transition: '0.2s',
-                              '&:hover': { color: '#fff' },
-                              display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                            }}
-                          >
-                            {h.text}
-                          </Typography>
-                        ))}
-                      </Box>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Post Info */}
-              <Card sx={{ mb: 3, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3 }}>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Typography variant='subtitle2' fontWeight={700} sx={{ color: '#fff', mb: 2 }}>Post Info</Typography>
-                  {[
-                    { icon: 'tabler-calendar', label: 'Published', value: post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-' },
-                    { icon: 'tabler-refresh', label: 'Updated', value: new Date(post.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
-                    { icon: 'tabler-clock', label: 'Read Time', value: `${post.readTime || '?'} min` },
-                    { icon: 'tabler-eye', label: 'Views', value: post.views.toLocaleString() },
-                    { icon: 'tabler-category', label: 'Category', value: post.category?.name || '-' },
-                  ].map(item => (
-                    <Box key={item.label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                        <i className={item.icon} style={{ fontSize: 14 }} /> {item.label}
-                      </Typography>
-                      <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{item.value}</Typography>
-                    </Box>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Share */}
-              <Card sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 3 }}>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Typography variant='subtitle2' fontWeight={700} sx={{ color: '#fff', mb: 2 }}>Share This Post</Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    {[
-                      { icon: 'tabler-brand-twitter', color: '#1DA1F2', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(shareUrl)}` },
-                      { icon: 'tabler-brand-facebook', color: '#4267B2', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}` },
-                      { icon: 'tabler-brand-linkedin', color: '#0077B5', url: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(shareUrl)}` },
-                      { icon: 'tabler-brand-whatsapp', color: '#25D366', url: `https://wa.me/?text=${encodeURIComponent(post.title + ' ' + shareUrl)}` },
-                    ].map(s => (
-                      <IconButton key={s.icon} size='small' onClick={() => window.open(s.url, '_blank')}
-                        sx={{ bgcolor: `${s.color}15`, color: s.color, '&:hover': { bgcolor: `${s.color}25` } }}>
-                        <i className={s.icon} style={{ fontSize: 18 }} />
-                      </IconButton>
                     ))}
                   </Box>
-                </CardContent>
-              </Card>
+                </Box>
+              )}
+
+              {/* Share */}
+              <Box>
+                <Typography variant='overline' sx={{ color: c.textSubtle, letterSpacing: 1.5, mb: 1.5, display: 'block', fontWeight: 700 }}>
+                  Share
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {[
+                    { icon: 'tabler-brand-twitter', label: 'Twitter', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(shareUrl)}` },
+                    { icon: 'tabler-brand-facebook', label: 'Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}` },
+                    { icon: 'tabler-brand-linkedin', label: 'LinkedIn', url: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(shareUrl)}` },
+                    { icon: 'tabler-brand-whatsapp', label: 'WhatsApp', url: `https://wa.me/?text=${encodeURIComponent(post.title + ' ' + shareUrl)}` },
+                  ].map(s => (
+                    <Tooltip key={s.icon} title={s.label}>
+                      <IconButton size='small' onClick={() => window.open(s.url, '_blank')}
+                        sx={{ color: c.textMuted, border: `1px solid ${c.border}`, '&:hover': { color: c.brand, borderColor: c.brand } }}>
+                        <i className={s.icon} style={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  ))}
+                </Box>
+              </Box>
             </Box>
           </Grid>
         </Grid>
       </Container>
 
       {/* Footer */}
-      <Box sx={{ bgcolor: '#131325', py: 5, textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <Box sx={{ bgcolor: c.footerBg, py: 5, textAlign: 'center', borderTop: `1px solid ${c.border}` }}>
         <Container maxWidth='lg'>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 2 }}>
             <Logo />
-            <Typography variant='h6' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
+            <Typography variant='h6' fontWeight={800} sx={{ color: c.text }}>Hosting Nepal</Typography>
           </Box>
-          <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.3)' }}>
-            {new Date().getFullYear()} &copy; Marketnminds Investment Group. All rights reserved.
+          <Typography variant='body2' sx={{ color: c.textSubtle }}>
+            {new Date().getFullYear()} &copy; Marketminds Investment Group. All rights reserved.
           </Typography>
         </Container>
       </Box>
