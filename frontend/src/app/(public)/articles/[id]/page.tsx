@@ -97,7 +97,7 @@ const BlogPostPage = async ({ params }: Props) => {
       {articleSchema && (
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
       )}
-      <PublicBlogPost slug={slug} />
+      <PublicBlogPost slug={slug} initialPost={post} />
     </>
   )
 }

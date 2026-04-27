@@ -9,7 +9,8 @@ import { getServerMode } from '@core/utils/serverHelpers'
 
 export const metadata: Metadata = {
   title: 'Login',
-  description: 'Login to your account'
+  description: 'Login to your account',
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } }
 }
 
 const LoginPage = async () => {

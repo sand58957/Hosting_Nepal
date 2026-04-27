@@ -580,7 +580,7 @@ const HomePage = () => {
                   mb: 3, fontWeight: 700, letterSpacing: 1.5, fontSize: '0.65rem',
                   bgcolor: 'rgba(115,103,240,0.15)', color: '#A89CF5', border: '1px solid rgba(115,103,240,0.3)'
                 }} />
-                <Typography variant='h2' fontWeight={800} sx={{
+                <Typography variant='h2' component='h1' fontWeight={800} sx={{
                   color: '#fff', mb: 2.5, lineHeight: 1.15,
                   fontSize: { xs: '2rem', sm: '2.5rem', md: '3.2rem' }
                 }}>

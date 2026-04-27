@@ -113,15 +113,15 @@ const palette = (isDark: boolean) => isDark ? {
   footerBg: '#F4F5F8',
 }
 
-const PublicBlogPost = ({ slug }: { slug: string }) => {
+const PublicBlogPost = ({ slug, initialPost = null }: { slug: string; initialPost?: Post | null }) => {
   const router = useRouter()
   const { mode, setMode, systemMode } = useColorScheme()
   const resolved = (mode === 'system' ? systemMode : mode) || 'dark'
   const isDark = resolved === 'dark'
   const c = palette(isDark)
 
-  const [post, setPost] = useState<Post | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [post, setPost] = useState<Post | null>(initialPost)
+  const [loading, setLoading] = useState(!initialPost)
   const [activeHeading, setActiveHeading] = useState('')
   const [progress, setProgress] = useState(0)
 

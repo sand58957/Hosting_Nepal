@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://hostingnepals.com'
+const OG_IMAGE = `${SITE_URL}/logo.png`
 
 export const metadata: Metadata = {
   title: 'Hosting Nepal — Best Web Hosting, Domain & VPS in Nepal 2026',
@@ -14,11 +15,13 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Hosting Nepal',
     countryName: 'Nepal',
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: 'Hosting Nepal — Web Hosting, Domains & VPS' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Hosting Nepal — Best Web Hosting in Nepal 2026',
     description: 'WordPress hosting from NPR 299/mo, VPS from NPR 1,500/mo. Free SSL, NVMe SSD. Pay via Khalti & eSewa. 24/7 Nepal support.',
+    images: [OG_IMAGE],
   },
 }
 
