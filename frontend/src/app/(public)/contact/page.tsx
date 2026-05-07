@@ -41,7 +41,7 @@ const ContactPage = () => {
       <Box sx={{ py: { xs: 6, md: 10 }, textAlign: 'center' }}>
         <Container maxWidth='md'>
           <Chip label='CONTACT US' size='small' sx={{ mb: 3, fontWeight: 700, letterSpacing: 1.5, fontSize: '0.65rem', bgcolor: 'rgba(40,199,111,0.15)', color: '#28C76F', border: '1px solid rgba(40,199,111,0.3)' }} />
-          <Typography variant='h3' fontWeight={800} sx={{ color: '#fff', mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>Get in Touch</Typography>
+          <Typography component='h1' variant='h3' fontWeight={800} sx={{ color: '#fff', mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>Contact Hosting Nepal</Typography>
           <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.5)', maxWidth: 550, mx: 'auto' }}>
             Have questions about our hosting services? Our Nepal-based team is here to help you 24/7. Reach out through any of the channels below.
           </Typography>

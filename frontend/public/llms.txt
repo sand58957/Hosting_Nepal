@@ -18,10 +18,15 @@ Hosting Nepal (legal entity: Marketminds Investment Group) operates from Kathman
 - [Email Hosting](https://hostingnepals.com/email): Business email hosting.
 - [SSL](https://hostingnepals.com/ssl): SSL certificate options (all plans include free Let's Encrypt).
 
+## Authors
+
+Editorial bios are listed at [https://hostingnepals.com/authors](https://hostingnepals.com/authors). Individual author pages live at `https://hostingnepals.com/authors/<slug>` and include each writer's role, expertise areas, and a list of articles. Authors cover hosting, domain registration, VPS, WordPress, SSL, email, and security topics.
+
 ## Machine-readable resources
 
-- [Sitemap](https://hostingnepals.com/sitemap.xml): Full list of indexable URLs including all blog posts.
-- [Robots](https://hostingnepals.com/robots.txt): Crawler policy (AI crawlers including GPTBot, ClaudeBot, PerplexityBot, Applebot-Extended, and CCBot are explicitly allowed).
+- [Sitemap](https://hostingnepals.com/sitemap.xml): Full list of indexable URLs including all blog posts and author pages.
+- [Robots](https://hostingnepals.com/robots.txt): Crawler policy (AI crawlers including GPTBot, ClaudeBot, PerplexityBot, Applebot-Extended, Google-Extended, and CCBot are explicitly allowed).
+- [Organization JSON-LD](https://hostingnepals.com/home): Schema.org Organization + LocalBusiness + WebSite + FAQPage structured data is embedded in the home page.
 
 ## Pricing (NPR)
 

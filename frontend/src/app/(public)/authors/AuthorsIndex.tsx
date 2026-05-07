@@ -61,8 +61,8 @@ const AuthorsIndex = () => {
       {/* Hero */}
       <Box sx={{ py: { xs: 6, md: 10 }, textAlign: 'center' }}>
         <Container maxWidth='md'>
-          <Typography variant='h3' fontWeight={800} sx={{ color: '#fff', mb: 1, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
-            Authors
+          <Typography component='h1' variant='h3' fontWeight={800} sx={{ color: '#fff', mb: 1, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+            Hosting Nepal Editorial Team
           </Typography>
           <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.5)' }}>
             The Hosting Nepal editorial team writes guides on hosting, domains, VPS, and security for Nepali websites.

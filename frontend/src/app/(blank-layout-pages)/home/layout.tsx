@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://hostingnepals.com'
-const OG_IMAGE = `${SITE_URL}/logo.png`
+const OG_IMAGE = `${SITE_URL}/og-default.png`
 
 export const metadata: Metadata = {
   title: 'Hosting Nepal — Best Web Hosting, Domain & VPS in Nepal 2026',

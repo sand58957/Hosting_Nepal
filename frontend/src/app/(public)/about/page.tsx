@@ -66,7 +66,7 @@ const AboutPage = () => {
       }}>
         <Container maxWidth='md'>
           <Chip label='ABOUT HOSTING NEPAL' size='small' sx={{ mb: 3, fontWeight: 700, letterSpacing: 1.5, fontSize: '0.65rem', bgcolor: 'rgba(115,103,240,0.15)', color: '#A89CF5', border: '1px solid rgba(115,103,240,0.3)' }} />
-          <Typography variant='h2' fontWeight={800} sx={{ color: '#fff', mb: 3, fontSize: { xs: '1.8rem', md: '3rem' }, lineHeight: 1.2 }}>
+          <Typography component='h1' variant='h2' fontWeight={800} sx={{ color: '#fff', mb: 3, fontSize: { xs: '1.8rem', md: '3rem' }, lineHeight: 1.2 }}>
             Powering Nepal&apos;s
             <Box component='span' sx={{ background: 'linear-gradient(135deg, #7367F0, #CE9FFC)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}> Digital Future</Box>
           </Typography>

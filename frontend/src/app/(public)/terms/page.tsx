@@ -50,7 +50,7 @@ const TermsPage = () => {
 
       <Box sx={{ py: { xs: 6, md: 8 }, textAlign: 'center' }}>
         <Container maxWidth='md'>
-          <Typography variant='h3' fontWeight={800} sx={{ color: '#fff', mb: 1, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>Terms of Service</Typography>
+          <Typography component='h1' variant='h3' fontWeight={800} sx={{ color: '#fff', mb: 1, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>Terms of Service</Typography>
           <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.45)' }}>Last updated: April 12, 2026</Typography>
         </Container>
       </Box>

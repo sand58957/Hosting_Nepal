@@ -1,83 +1,48 @@
-# Hosting Nepal - Robots.txt
-# Allow all search engines and AI bots for SEO/AEO/AIO visibility
+# Hosting Nepal — robots.txt
+# All search engines and AI crawlers (GPTBot, ClaudeBot, PerplexityBot,
+# Google-Extended, Applebot-Extended, CCBot, Amazonbot, meta-externalagent,
+# Bytespider) are welcomed via the catch-all User-agent: * block below.
+# Per RFC 9309, AI bots fall back to the `*` rules when no UA-specific
+# block exists, so we keep a single source of truth here to avoid drift.
 
 User-agent: *
 Allow: /
-Allow: /home
-Allow: /articles
-Allow: /articles/*
-Allow: /about
-Allow: /contact
-Allow: /terms
-Allow: /privacy
-Allow: /hosting/plans
-Allow: /vps/order
-Allow: /domains/search
-Allow: /email
-Allow: /ssl
 
 Disallow: /dashboard
-Disallow: /dashboard/*
+Disallow: /dashboard/
 Disallow: /blog
-Disallow: /blog/*
+Disallow: /blog/
 Disallow: /billing
-Disallow: /billing/*
+Disallow: /billing/
 Disallow: /support
-Disallow: /support/*
+Disallow: /support/
 Disallow: /settings
 Disallow: /users
 Disallow: /containers
-Disallow: /containers/*
-Disallow: /hosting/tools/*
-Disallow: /hosting/security/*
-Disallow: /hosting/speed/*
-Disallow: /hosting/email/*
-Disallow: /hosting/domains/*
-Disallow: /hosting/wordpress/*
+Disallow: /containers/
+Disallow: /hosting/tools/
+Disallow: /hosting/security/
+Disallow: /hosting/speed/
+Disallow: /hosting/email/
+Disallow: /hosting/domains/
+Disallow: /hosting/wordpress/
 Disallow: /domains/dns
 Disallow: /domains/portfolio
-Disallow: /domains/settings/*
-Disallow: /domains/investor/*
+Disallow: /domains/settings/
+Disallow: /domains/investor/
 Disallow: /domains/activity-log
-Disallow: /vps/*/
-
-# Explicitly allow AI search bots for AIO/AEO ranking
-User-agent: GPTBot
-Allow: /
-Allow: /articles/*
-Allow: /home
-Allow: /about
-
-User-agent: Google-Extended
-Allow: /
-Allow: /articles/*
-
-User-agent: ClaudeBot
-Allow: /
-Allow: /articles/*
-
-User-agent: Applebot-Extended
-Allow: /
-Allow: /articles/*
-
-User-agent: PerplexityBot
-Allow: /
-Allow: /articles/*
-
-User-agent: Amazonbot
-Allow: /
-Allow: /articles/*
-
-User-agent: Bytespider
-Allow: /
-Allow: /articles/*
-
-User-agent: CCBot
-Allow: /
-Allow: /articles/*
-
-User-agent: meta-externalagent
-Allow: /
-Allow: /articles/*
+Disallow: /vps/addons
+Disallow: /vps/password-reset
+Disallow: /vps/region-transfer
+Disallow: /vps/reinstall
+Disallow: /vps/rescue
+Disallow: /vps/snapshots
+Disallow: /vps/storage
+Disallow: /vps/upgrade
+Disallow: /vps/vnc
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /api/
 
 Sitemap: https://hostingnepals.com/sitemap.xml
