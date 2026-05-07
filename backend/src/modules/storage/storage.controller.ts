@@ -35,7 +35,7 @@ export class StorageController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload an image to Cloudflare R2 (admin only)' })
+  @ApiOperation({ summary: 'Upload an image to VPS local storage (admin only)' })
   async upload(
     @UploadedFile() file: { originalname: string; buffer: Buffer; mimetype: string; size: number } | undefined,
     @Query('folder') folder?: string,

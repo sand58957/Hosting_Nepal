@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -10,7 +11,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
@@ -18,10 +19,24 @@ async function bootstrap(): Promise<void> {
   const port = configService.get<number>('APP_PORT', 3001);
   const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   const appEnv = configService.get<string>('APP_ENV', 'development');
+  const uploadDir = configService.get<string>('UPLOAD_DIR') || '/var/uploads';
 
-  // Security
-  app.use(helmet());
+  // Security — relax CORP so /uploads images embed cross-origin from hostingnepals.com
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(compression());
+
+  // Serve user-uploaded images from the VPS disk. Cloudflare caches at the edge,
+  // so origin hits should be rare; we still set a long max-age + immutable.
+  app.useStaticAssets(uploadDir, {
+    prefix: '/uploads/',
+    maxAge: '30d',
+    immutable: true,
+    index: false,
+    setHeaders(res) {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+    },
+  });
 
   // CORS
   app.enableCors({

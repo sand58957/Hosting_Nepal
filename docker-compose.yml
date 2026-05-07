@@ -38,6 +38,8 @@ services:
     env_file: ./backend/.env.production
     ports:
       - "127.0.0.1:4001:4001"
+    volumes:
+      - hn_uploads:/var/uploads
     depends_on:
       hn-postgres:
         condition: service_healthy
@@ -64,6 +66,7 @@ services:
 volumes:
   hn_pgdata:
   hn_redisdata:
+  hn_uploads:
 
 networks:
   hn-network:

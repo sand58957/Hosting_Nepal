@@ -1,8 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException, BadGatewayException } from '@nestjs/common';
+import { Injectable, Logger, BadGatewayException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { promises as fs } from 'fs';
+import { join, dirname, extname } from 'path';
 import { createHash, randomBytes } from 'crypto';
-import { extname } from 'path';
 
 export interface UploadResult {
   key: string;
@@ -11,60 +11,37 @@ export interface UploadResult {
   contentType: string;
 }
 
+const DEFAULT_UPLOAD_DIR = '/var/uploads';
+const DEFAULT_PUBLIC_BASE = 'https://api.hostingnepals.com/uploads';
+
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
-  private client: S3Client | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
   isConfigured(): boolean {
-    return !!(
-      this.config.get<string>('R2_ACCOUNT_ID') &&
-      this.config.get<string>('R2_ACCESS_KEY_ID') &&
-      this.config.get<string>('R2_SECRET_ACCESS_KEY') &&
-      this.config.get<string>('R2_BUCKET')
-    );
+    return true;
   }
 
-  private getClient(): S3Client {
-    if (this.client) return this.client;
+  private uploadDir(): string {
+    return this.config.get<string>('UPLOAD_DIR') || DEFAULT_UPLOAD_DIR;
+  }
 
-    const accountId = this.config.get<string>('R2_ACCOUNT_ID');
-    const accessKeyId = this.config.get<string>('R2_ACCESS_KEY_ID');
-    const secretAccessKey = this.config.get<string>('R2_SECRET_ACCESS_KEY');
-
-    if (!accountId || !accessKeyId || !secretAccessKey) {
-      throw new ServiceUnavailableException('R2 storage is not configured');
-    }
-
-    this.client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
-    return this.client;
+  private publicBase(): string {
+    return (this.config.get<string>('UPLOAD_PUBLIC_BASE_URL') || DEFAULT_PUBLIC_BASE).replace(/\/+$/, '');
   }
 
   async upload(buffer: Buffer, key: string, contentType: string): Promise<UploadResult> {
-    const bucket = this.config.get<string>('R2_BUCKET');
+    const safeKey = this.sanitizeKey(key);
+    const fullPath = join(this.uploadDir(), safeKey);
 
-    if (!bucket) throw new ServiceUnavailableException('R2_BUCKET not set');
-
-    await this.getClient().send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000, immutable',
-      }),
-    );
+    await fs.mkdir(dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, buffer);
 
     return {
-      key,
-      url: this.getPublicUrl(key),
+      key: safeKey,
+      url: this.getPublicUrl(safeKey),
       size: buffer.byteLength,
       contentType,
     };
@@ -116,25 +93,31 @@ export class StorageService {
   }
 
   async delete(key: string): Promise<void> {
-    const bucket = this.config.get<string>('R2_BUCKET');
+    const safeKey = this.sanitizeKey(key);
+    const fullPath = join(this.uploadDir(), safeKey);
 
-    if (!bucket) throw new ServiceUnavailableException('R2_BUCKET not set');
-
-    await this.getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    try {
+      await fs.unlink(fullPath);
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        this.logger.warn(`Failed to delete ${safeKey}: ${err.message}`);
+        throw err;
+      }
+    }
   }
 
   getPublicUrl(key: string): string {
-    const base = this.config.get<string>('R2_PUBLIC_BASE_URL');
+    return `${this.publicBase()}/${this.sanitizeKey(key)}`;
+  }
 
-    if (!base) {
-      this.logger.warn('R2_PUBLIC_BASE_URL is not set; returning r2.cloudflarestorage.com signed-style path');
-      const accountId = this.config.get<string>('R2_ACCOUNT_ID');
-      const bucket = this.config.get<string>('R2_BUCKET');
+  private sanitizeKey(key: string): string {
+    const cleaned = key.replace(/^\/+/, '').replace(/\\/g, '/');
 
-      return `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${key}`;
+    if (cleaned.split('/').some(seg => seg === '..' || seg === '')) {
+      throw new BadGatewayException('Invalid storage key');
     }
 
-    return `${base.replace(/\/+$/, '')}/${key}`;
+    return cleaned;
   }
 
   private extForContentType(contentType: string): string {

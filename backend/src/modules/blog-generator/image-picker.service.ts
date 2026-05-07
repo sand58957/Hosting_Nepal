@@ -33,17 +33,15 @@ export class ImagePickerService {
   async pick(query: string, categorySlug: string, altFallback: string, slugForFilename?: string): Promise<PickedImage> {
     const sourceUrl = await this.sourceUrl(query, categorySlug);
 
-    if (this.storage.isConfigured()) {
-      try {
-        const uploaded = await this.storage.uploadFromUrl(sourceUrl, 'blog/featured', slugForFilename || categorySlug);
+    try {
+      const uploaded = await this.storage.uploadFromUrl(sourceUrl, 'blog/featured', slugForFilename || categorySlug);
 
-        return { url: uploaded.url, alt: altFallback };
-      } catch (err) {
-        this.logger.warn(`R2 mirror failed, falling back to direct URL: ${(err as Error).message}`);
-      }
+      return { url: uploaded.url, alt: altFallback };
+    } catch (err) {
+      this.logger.warn(`Local mirror failed, falling back to direct URL: ${(err as Error).message}`);
+
+      return { url: sourceUrl, alt: altFallback };
     }
-
-    return { url: sourceUrl, alt: altFallback };
   }
 
   private async sourceUrl(query: string, categorySlug: string): Promise<string> {
