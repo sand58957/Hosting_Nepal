@@ -7,6 +7,9 @@ import 'react-perfect-scrollbar/dist/css/styles.css'
 // Type Imports
 import type { ChildrenType } from '@core/types'
 
+// Component Imports
+import AdsenseAutoAds from '@/components/AdsenseAutoAds'
+
 // Util Imports
 import { getSystemMode } from '@core/utils/serverHelpers'
 
@@ -69,10 +72,10 @@ const RootLayout = async (props: ChildrenType) => {
           address: { '@type': 'PostalAddress', streetAddress: 'Near Rastriya Banijya Bank, Koteshwor-32', addressLocality: 'Kathmandu', addressRegion: 'Bagmati', postalCode: '44600', addressCountry: 'NP' },
           geo: { '@type': 'GeoCoordinates', latitude: '27.6783', longitude: '85.3492' },
           telephone: '+977-9802348957',
-          email: 'admin@hostingnepals.com',
+          email: 'support@hostingnepals.com',
           contactPoint: [
-            { '@type': 'ContactPoint', contactType: 'sales', telephone: '+977-9802348957', email: 'admin@hostingnepals.com', availableLanguage: ['English', 'Nepali'], areaServed: 'NP' },
-            { '@type': 'ContactPoint', contactType: 'technical support', telephone: '+977-9709066745', email: 'admin@hostingnepals.com', availableLanguage: ['English', 'Nepali'], areaServed: 'NP' },
+            { '@type': 'ContactPoint', contactType: 'sales', telephone: '+977-9802348957', email: 'support@hostingnepals.com', availableLanguage: ['English', 'Nepali'], areaServed: 'NP' },
+            { '@type': 'ContactPoint', contactType: 'technical support', telephone: '+977-9709066745', email: 'support@hostingnepals.com', availableLanguage: ['English', 'Nepali'], areaServed: 'NP' },
           ],
           areaServed: { '@type': 'Country', name: 'Nepal', '@id': 'https://www.wikidata.org/wiki/Q837' },
           serviceArea: { '@type': 'GeoCircle', geoMidpoint: { '@type': 'GeoCoordinates', latitude: '27.7172', longitude: '85.3240' }, geoRadius: '500000' },
@@ -129,6 +132,7 @@ const RootLayout = async (props: ChildrenType) => {
       </head>
       <body className='flex is-full min-bs-full flex-auto flex-col'>
         <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
+        <AdsenseAutoAds />
         {children}
       </body>
     </html>

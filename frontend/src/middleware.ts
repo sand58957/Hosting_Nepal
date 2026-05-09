@@ -1,33 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Paths that are pure marketing / public content. Safe to cache HTML at edge.
-// Anything not listed here keeps Next.js's default `no-store` (e.g. dashboard,
-// authenticated pages, API routes, login).
-const PUBLIC_PATHS = [
-  '/home',
-  '/articles',
-  '/authors',
-  '/about',
-  '/contact',
-  '/privacy',
-  '/terms',
-  '/hosting/plans',
-  '/vps/order',
-  '/vps/vds/order',
-  '/vps/dedicated/order',
-  '/domains/search',
-  '/ssl',
-  '/email',
-]
+import { isPublicPath } from '@/lib/publicPaths'
 
-const PUBLIC_PREFIXES = ['/articles/', '/authors/']
-
-function isPublicPath(pathname: string): boolean {
-  if (PUBLIC_PATHS.includes(pathname)) return true
-
-  return PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix))
-}
+// Public paths get edge HTML caching. Anything not in the shared list keeps
+// Next.js's default `no-store` (dashboard, authenticated pages, API, auth).
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

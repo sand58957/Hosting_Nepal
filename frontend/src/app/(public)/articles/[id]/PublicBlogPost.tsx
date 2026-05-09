@@ -19,6 +19,7 @@ import Tooltip from '@mui/material/Tooltip'
 import { useColorScheme } from '@mui/material/styles'
 
 import Logo from '@core/svg/Logo'
+import AdsenseInArticle from '@/components/AdsenseInArticle'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001/api/v1'
 
@@ -405,6 +406,11 @@ const PublicBlogPost = ({ slug, initialPost = null }: { slug: string; initialPos
                 '& img': { maxWidth: '100%', borderRadius: 2, border: `1px solid ${c.border}`, aspectRatio: '16 / 9', objectFit: 'cover', display: 'block', my: 3 },
               }}
             />
+
+            {/* End-of-article ad slot */}
+            <Box sx={{ maxWidth: '68ch', mt: 5, mb: 2 }}>
+              <AdsenseInArticle />
+            </Box>
 
             {/* Tags */}
             {post.tags.length > 0 && (
