@@ -7,9 +7,6 @@ import 'react-perfect-scrollbar/dist/css/styles.css'
 // Type Imports
 import type { ChildrenType } from '@core/types'
 
-// Component Imports
-import AdsenseAutoAds from '@/components/AdsenseAutoAds'
-
 // Util Imports
 import { getSystemMode } from '@core/utils/serverHelpers'
 
@@ -58,6 +55,14 @@ const RootLayout = async (props: ChildrenType) => {
   return (
     <html id='__next' lang='en' dir={direction} suppressHydrationWarning>
       <head>
+        {/* Google AdSense loader — site-wide. Auto Ads page exclusions
+            in the AdSense dashboard control which routes actually serve
+            ads (auth/dashboard routes are excluded). */}
+        <script
+          async
+          src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7636052892520336'
+          crossOrigin='anonymous'
+        />
         {/* Organization + LocalBusiness Schema (SEO + AIO + GEO) */}
         <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context': 'https://schema.org',
@@ -132,7 +137,6 @@ const RootLayout = async (props: ChildrenType) => {
       </head>
       <body className='flex is-full min-bs-full flex-auto flex-col'>
         <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
-        <AdsenseAutoAds />
         {children}
       </body>
     </html>
