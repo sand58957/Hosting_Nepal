@@ -476,7 +476,7 @@ const HomePage = () => {
                       Get Started
                     </Button>
                     {/* Mobile Menu Button */}
-                    <IconButton onClick={() => setMobileOpen(true)} sx={{ display: { xs: 'flex', lg: 'none' }, color: '#fff', ml: 0.5 }}>
+                    <IconButton aria-label='Open menu' onClick={() => setMobileOpen(true)} sx={{ display: { xs: 'flex', lg: 'none' }, color: '#fff', ml: 0.5 }}>
                       <i className='tabler-menu-2' style={{ fontSize: 22 }} />
                     </IconButton>
                   </Box>
@@ -494,7 +494,7 @@ const HomePage = () => {
                     <Logo />
                     <Typography variant='body1' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
                   </Box>
-                  <IconButton onClick={() => setMobileOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  <IconButton aria-label='Close menu' onClick={() => setMobileOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
                     <i className='tabler-x' style={{ fontSize: 20 }} />
                   </IconButton>
                 </Box>
@@ -1235,7 +1235,7 @@ const HomePage = () => {
                   }}>
                     {blogPosts[0].featuredImage && (
                       <Box sx={{ position: 'relative', height: 280, overflow: 'hidden' }}>
-                        <Box component='img' src={blogPosts[0].featuredImage} alt={blogPosts[0].title} sx={{
+                        <Box component='img' src={blogPosts[0].featuredImage} alt={blogPosts[0].title} loading='lazy' sx={{
                           width: '100%', height: '100%', objectFit: 'cover',
                           transition: 'transform 0.6s ease', '&:hover': { transform: 'scale(1.05)' },
                         }} />
@@ -1309,7 +1309,7 @@ const HomePage = () => {
                     }}>
                       {post.featuredImage && (
                         <Box sx={{ width: 140, minHeight: 140, flexShrink: 0, overflow: 'hidden' }}>
-                          <Box component='img' src={post.featuredImage} alt={post.title} sx={{
+                          <Box component='img' src={post.featuredImage} alt={post.title} loading='lazy' sx={{
                             width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s',
                           }} />
                         </Box>
@@ -1475,7 +1475,7 @@ const HomePage = () => {
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {['tabler-brand-facebook', 'tabler-brand-twitter', 'tabler-brand-instagram'].map(icon => (
-                  <IconButton key={icon} size='small' sx={{ color: '#fff', '&:hover': { color: '#28C76F' } }}>
+                  <IconButton key={icon} aria-label={icon.replace('tabler-brand-', '')} size='small' sx={{ color: '#fff', '&:hover': { color: '#28C76F' } }}>
                     <i className={icon} style={{ fontSize: 20 }} />
                   </IconButton>
                 ))}
@@ -1520,7 +1520,7 @@ const HomePage = () => {
               <Typography variant='subtitle2' fontWeight={700} sx={{ mb: 1.5, color: '#fff' }}>Contact</Typography>
               <Typography variant='body2' sx={{ color: '#fff', lineHeight: 1.8 }}>
                 Koteshwor, Kathmandu, Nepal<br />
-                admin@hostingnepals.com<br />
+                support@hostingnepals.com<br />
                 +977-9802348957
               </Typography>
             </Grid>

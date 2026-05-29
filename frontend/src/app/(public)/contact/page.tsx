@@ -62,8 +62,8 @@ const ContactPage = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   <Box>
                     <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', display: 'block', mb: 0.3 }}>General Inquiries</Typography>
-                    <Typography variant='body2' component='a' href='mailto:admin@hostingnepals.com' sx={{ color: '#7367F0', textDecoration: 'none', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}>
-                      admin@hostingnepals.com
+                    <Typography variant='body2' component='a' href='mailto:support@hostingnepals.com' sx={{ color: '#7367F0', textDecoration: 'none', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}>
+                      support@hostingnepals.com
                     </Typography>
                   </Box>
                   <Box>

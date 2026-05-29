@@ -4,7 +4,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://hostingnepals.com'
 
 export const metadata: Metadata = {
   title: 'Contact Hosting Nepal — 24/7 Support | Kathmandu, Nepal',
-  description: 'Contact Hosting Nepal for sales and technical support. Call +977-9802348957, email admin@hostingnepals.com, or visit our Koteshwor, Kathmandu office. 24/7 support in English and Nepali.',
+  description: 'Contact Hosting Nepal for sales and technical support. Call +977-9802348957, email support@hostingnepals.com, or visit our Koteshwor, Kathmandu office. 24/7 support in English and Nepali.',
   keywords: 'contact hosting nepal, hosting nepal support, hosting nepal phone, hosting nepal email, kathmandu hosting support',
   alternates: { canonical: `${SITE_URL}/contact` },
   openGraph: {

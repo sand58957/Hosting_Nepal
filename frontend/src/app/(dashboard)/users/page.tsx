@@ -62,7 +62,7 @@ const roleColors: Record<string, 'error' | 'warning' | 'info' | 'success' | 'def
 const statusColors: Record<string, 'success' | 'error' | 'warning' | 'default'> = {
   ACTIVE: 'success',
   SUSPENDED: 'error',
-  PENDING: 'warning',
+  PENDING_VERIFICATION: 'warning',
   INACTIVE: 'default',
 }
 
@@ -520,8 +520,8 @@ const UsersPage = () => {
                 <MenuItem key={r} value={r}>{r.replace('_', ' ')}</MenuItem>
               ))
             ) : (
-              ['ACTIVE', 'SUSPENDED', 'PENDING', 'INACTIVE'].map(s => (
-                <MenuItem key={s} value={s}>{s}</MenuItem>
+              ['ACTIVE', 'SUSPENDED', 'PENDING_VERIFICATION', 'INACTIVE'].map(s => (
+                <MenuItem key={s} value={s}>{s.replace('_', ' ')}</MenuItem>
               ))
             )}
           </CustomTextField>

@@ -55,6 +55,10 @@ const RootLayout = async (props: ChildrenType) => {
   return (
     <html id='__next' lang='en' dir={direction} suppressHydrationWarning>
       <head>
+        {/* Speed up connections to third-party + API origins */}
+        <link rel='preconnect' href='https://pagead2.googlesyndication.com' crossOrigin='anonymous' />
+        <link rel='preconnect' href='https://api.hostingnepals.com' />
+        <link rel='dns-prefetch' href='https://pagead2.googlesyndication.com' />
         {/* Google AdSense loader — site-wide. Auto Ads page exclusions
             in the AdSense dashboard control which routes actually serve
             ads (auth/dashboard routes are excluded). */}
