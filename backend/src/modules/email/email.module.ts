@@ -6,6 +6,7 @@ import { EmailService } from './email.service';
 import { TitanEmailService } from './services/titan-email.service';
 import { SendgridService } from './services/sendgrid.service';
 import { EmailProcessor } from './processors/email.processor';
+import { BillingEmailListener } from './listeners/billing-email.listener';
 import { PrismaService } from '../../database/prisma.service';
 import { ResellerClubService } from '../domain/services/resellerclub.service';
 
@@ -15,7 +16,7 @@ import { ResellerClubService } from '../domain/services/resellerclub.service';
     BullModule.registerQueue({ name: 'email-provisioning' }),
   ],
   controllers: [EmailController],
-  providers: [EmailService, TitanEmailService, SendgridService, EmailProcessor, PrismaService, ResellerClubService],
+  providers: [EmailService, TitanEmailService, SendgridService, EmailProcessor, BillingEmailListener, PrismaService, ResellerClubService],
   exports: [EmailService, SendgridService],
 })
 export class EmailModule {}

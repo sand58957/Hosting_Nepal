@@ -159,11 +159,11 @@ export class InvoiceService {
       },
       company: {
         name: 'Hosting Nepal Pvt. Ltd.',
-        address: 'Kathmandu, Nepal',
+        address: 'Koteshwor-32, Kathmandu, Nepal',
         panNumber: '000000000', // Replace with actual PAN
-        phone: '+977-1-XXXXXXX',
-        email: 'billing@hostingnepal.com',
-        website: 'https://hostingnepal.com',
+        phone: '+977-9802348957',
+        email: 'support@hostingnepals.com',
+        website: 'https://hostingnepals.com',
       },
       items: [
         {
