@@ -1,10 +1,10 @@
 'use client'
 
 // React Imports
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 // Next Imports
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 // MUI Imports
 import useMediaQuery from '@mui/material/useMediaQuery'
@@ -27,6 +27,8 @@ import type { SystemMode } from '@core/types'
 import Link from '@components/Link'
 import Logo from '@components/layout/shared/Logo'
 import CustomTextField from '@core/components/mui/TextField'
+import GoogleSignInButton from '@components/auth/GoogleSignInButton'
+import Divider from '@mui/material/Divider'
 
 // Config Imports
 import themeConfig from '@configs/themeConfig'
@@ -81,7 +83,18 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
 
   // Hooks
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { settings } = useSettings()
+
+  useEffect(() => {
+    const oauthError = searchParams.get('error')
+    if (oauthError) {
+      setError(oauthError)
+      // Clean the query so a refresh doesn't re-show the error
+      router.replace('/login')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const theme = useTheme()
   const hidden = useMediaQuery(theme.breakpoints.down('md'))
   const authBackground = useImageVariant(mode, lightImg, darkImg)
@@ -113,8 +126,10 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
         setError('Invalid response from server.')
       }
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } }
-      setError(error?.response?.data?.message || 'Login failed. Please check your credentials.')
+      const error = err as { response?: { data?: { message?: string | string[] } } }
+      const apiMsg = error?.response?.data?.message
+      const msg = Array.isArray(apiMsg) ? apiMsg.join(', ') : apiMsg
+      setError(msg || 'Login failed. Please check your credentials.')
     } finally {
       setLoading(false)
     }
@@ -226,6 +241,11 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
               {error}
             </Alert>
           )}
+
+          <GoogleSignInButton />
+          <Divider sx={{ '&::before, &::after': { borderColor: 'divider' } }}>
+            <Typography variant='caption' color='text.secondary'>or sign in with email</Typography>
+          </Divider>
 
           <form noValidate autoComplete='off' onSubmit={handleSubmit} className='flex flex-col gap-5'>
             <CustomTextField

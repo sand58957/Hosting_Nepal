@@ -125,6 +125,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'This account uses Google sign-in. Please continue with Google.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(
       dto.password,
       user.passwordHash,
@@ -174,6 +180,130 @@ export class AuthService {
     });
 
     this.logger.log(`User logged in: ${user.email}`);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        companyName: user.companyName,
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  // ─── Google OAuth Login ────────────────────────────────────────────────
+
+  async loginWithGoogle(
+    profile: {
+      googleId: string;
+      email: string;
+      emailVerified: boolean;
+      name: string;
+      avatarUrl: string | null;
+    },
+    ip?: string,
+  ): Promise<AuthResponse> {
+    // Find by googleId first, then fall back to matching email so existing
+    // password users seamlessly link to their Google identity.
+    let user = await this.prisma.user.findUnique({
+      where: { googleId: profile.googleId },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.findUnique({
+        where: { email: profile.email },
+      });
+    }
+
+    if (user) {
+      if (user.status === 'SUSPENDED') {
+        throw new ForbiddenException(
+          'Your account has been suspended. Please contact support.',
+        );
+      }
+
+      if (user.status === 'INACTIVE') {
+        throw new UnauthorizedException('This account is no longer active.');
+      }
+
+      if (user.twoFactorEnabled) {
+        throw new ForbiddenException(
+          'This account has two-factor authentication enabled. Please sign in with email and password.',
+        );
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (!user.googleId) updates.googleId = profile.googleId;
+      if (!user.avatarUrl && profile.avatarUrl) updates.avatarUrl = profile.avatarUrl;
+      if (!user.emailVerified && profile.emailVerified) {
+        updates.emailVerified = true;
+        if (user.status === 'PENDING_VERIFICATION') updates.status = 'ACTIVE';
+      }
+
+      if (Object.keys(updates).length > 0) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: updates,
+        });
+      }
+    } else {
+      user = await this.prisma.user.create({
+        data: {
+          email: profile.email,
+          name: profile.name,
+          googleId: profile.googleId,
+          avatarUrl: profile.avatarUrl,
+          passwordHash: null,
+          role: 'CUSTOMER',
+          status: profile.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION',
+          emailVerified: profile.emailVerified,
+          phoneVerified: false,
+          twoFactorEnabled: false,
+        },
+      });
+
+      const firstName = user.name?.split(' ')[0] || 'User';
+      this.sendgridService
+        .sendWelcome({ email: user.email, firstName })
+        .catch((err) => this.logger.error(`Welcome email error: ${err.message}`));
+
+      this.eventEmitter.emit('auth.register', {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        ip,
+      });
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email, user.role);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+        lastLoginIp: ip ?? null,
+        refreshToken: await bcrypt.hash(tokens.refreshToken, this.SALT_ROUNDS),
+      },
+    });
+
+    this.eventEmitter.emit('auth.login', {
+      userId: user.id,
+      email: user.email,
+      ip,
+      provider: 'google',
+    });
+
+    this.logger.log(`User logged in via Google: ${user.email}`);
 
     return {
       user: {

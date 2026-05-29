@@ -16,6 +16,8 @@ import type { SystemMode } from '@core/types'
 import Link from '@components/Link'
 import Logo from '@components/layout/shared/Logo'
 import CustomTextField from '@core/components/mui/TextField'
+import GoogleSignInButton from '@components/auth/GoogleSignInButton'
+import Divider from '@mui/material/Divider'
 
 import { useSettings } from '@core/hooks/useSettings'
 
@@ -199,6 +201,15 @@ const Register = ({ mode: _mode }: { mode: SystemMode }) => {
             <Alert severity='success'>
               {success}
             </Alert>
+          )}
+
+          {!success && (
+            <>
+              <GoogleSignInButton label='Sign up with Google' />
+              <Divider sx={{ '&::before, &::after': { borderColor: 'divider' } }}>
+                <Typography variant='caption' color='text.secondary'>or use your email</Typography>
+              </Divider>
+            </>
           )}
 
           {!success && (

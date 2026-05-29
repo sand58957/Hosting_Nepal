@@ -82,8 +82,10 @@ const ForgotPassword = ({ mode }: { mode: SystemMode }) => {
       await api.post('/auth/forgot-password', { email })
       setSuccess('If an account with that email exists, we have sent a password reset link.')
     } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { message?: string } } }
-      setError(errorObj?.response?.data?.message || 'Something went wrong. Please try again.')
+      const errorObj = err as { response?: { data?: { message?: string | string[] } } }
+      const apiMsg = errorObj?.response?.data?.message
+      const msg = Array.isArray(apiMsg) ? apiMsg.join(', ') : apiMsg
+      setError(msg || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }

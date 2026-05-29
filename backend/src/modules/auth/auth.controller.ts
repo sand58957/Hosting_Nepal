@@ -11,10 +11,12 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
+import { GoogleProfile } from './strategies/google.strategy';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -24,7 +26,10 @@ import { Verify2FADto } from './dto/verify-2fa.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // ─── Registration ──────────────────────────────────────────────────────
 
@@ -59,6 +64,53 @@ export class AuthController {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     };
+  }
+
+  // ─── Google OAuth ──────────────────────────────────────────────────────
+
+  // Initiates Google OAuth — Passport redirects to Google's consent screen.
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleAuth(): void {
+    // handled by passport-google-oauth20 guard
+  }
+
+  // Google redirects here after consent. Issue our own tokens, then bounce
+  // back to the frontend with tokens in the URL hash (hash never hits server
+  // logs or the Referer header).
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthCallback(
+    @Req() req: Request,
+    @Ip() ip: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+
+    try {
+      const profile = req.user as GoogleProfile;
+      const result = await this.authService.loginWithGoogle(profile, ip);
+
+      response.cookie('refresh_token', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/auth/refresh',
+      });
+
+      const params = new URLSearchParams({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+
+      response.redirect(`${frontendUrl}/auth/google-callback#${params.toString()}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google sign-in failed';
+      const params = new URLSearchParams({ error: message });
+      response.redirect(`${frontendUrl}/login?${params.toString()}`);
+    }
   }
 
   // ─── Refresh Token ─────────────────────────────────────────────────────
