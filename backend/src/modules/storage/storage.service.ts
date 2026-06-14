@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join, dirname, extname } from 'path';
 import { createHash, randomBytes } from 'crypto';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 export interface UploadResult {
   key: string;
@@ -18,7 +19,46 @@ const DEFAULT_PUBLIC_BASE = 'https://api.hostingnepals.com/uploads';
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  // R2 (Cloudflare object storage) — used when all R2_* env vars are present.
+  // Falls back to local /var/uploads disk otherwise, so this is safe to ship
+  // before the env is set.
+  private readonly s3: S3Client | null = null;
+  private readonly r2Bucket: string = '';
+  private readonly r2PublicBase: string = '';
+
+  constructor(private readonly config: ConfigService) {
+    // Accept either a full endpoint (R2_ACCOUNT_ENDPOINT) or just the account id
+    // (R2_ACCOUNT_ID) and build the S3 endpoint from it.
+    const accountId = this.config.get<string>('R2_ACCOUNT_ID');
+    const endpoint =
+      this.config.get<string>('R2_ACCOUNT_ENDPOINT') ||
+      (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : undefined);
+    const accessKeyId = this.config.get<string>('R2_ACCESS_KEY_ID');
+    const secretAccessKey = this.config.get<string>('R2_SECRET_ACCESS_KEY');
+    const bucket = this.config.get<string>('R2_BUCKET') || '';
+    const publicBase = (this.config.get<string>('R2_PUBLIC_BASE_URL') || '').replace(/\/+$/, '');
+
+    if (endpoint && accessKeyId && secretAccessKey && bucket && publicBase) {
+      this.s3 = new S3Client({
+        region: 'auto',
+        endpoint,
+        credentials: { accessKeyId, secretAccessKey },
+        // R2 rejects the SDK's default flexible-checksum (CRC32) headers; only
+        // send them when an operation strictly requires it.
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
+      } as any);
+      this.r2Bucket = bucket;
+      this.r2PublicBase = publicBase;
+      this.logger.log(`R2 storage enabled (bucket=${bucket}, public=${publicBase})`);
+    } else {
+      this.logger.log('R2 not configured — using local /var/uploads disk storage');
+    }
+  }
+
+  private r2Enabled(): boolean {
+    return this.s3 !== null;
+  }
 
   isConfigured(): boolean {
     return true;
@@ -29,15 +69,30 @@ export class StorageService {
   }
 
   private publicBase(): string {
+    if (this.r2Enabled()) return this.r2PublicBase;
+
     return (this.config.get<string>('UPLOAD_PUBLIC_BASE_URL') || DEFAULT_PUBLIC_BASE).replace(/\/+$/, '');
   }
 
   async upload(buffer: Buffer, key: string, contentType: string): Promise<UploadResult> {
     const safeKey = this.sanitizeKey(key);
-    const fullPath = join(this.uploadDir(), safeKey);
 
-    await fs.mkdir(dirname(fullPath), { recursive: true });
-    await fs.writeFile(fullPath, buffer);
+    if (this.r2Enabled()) {
+      await this.s3!.send(
+        new PutObjectCommand({
+          Bucket: this.r2Bucket,
+          Key: safeKey,
+          Body: buffer,
+          ContentType: contentType,
+          CacheControl: 'public, max-age=31536000, immutable',
+        }),
+      );
+    } else {
+      const fullPath = join(this.uploadDir(), safeKey);
+
+      await fs.mkdir(dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, buffer);
+    }
 
     return {
       key: safeKey,
@@ -94,6 +149,17 @@ export class StorageService {
 
   async delete(key: string): Promise<void> {
     const safeKey = this.sanitizeKey(key);
+
+    if (this.r2Enabled()) {
+      try {
+        await this.s3!.send(new DeleteObjectCommand({ Bucket: this.r2Bucket, Key: safeKey }));
+      } catch (err: any) {
+        this.logger.warn(`Failed to delete ${safeKey} from R2: ${err.message}`);
+      }
+
+      return;
+    }
+
     const fullPath = join(this.uploadDir(), safeKey);
 
     try {
