@@ -45,9 +45,12 @@ const statusColorMap: Record<string, 'success' | 'warning' | 'error' | 'default'
   EXPIRED: 'error',
   SUSPENDED: 'error',
   PENDING: 'warning',
+  PENDING_APPROVAL: 'warning',
+  PENDING_REGISTRATION: 'warning',
+  REJECTED: 'error',
 }
 
-const statusOptions = ['All', 'ACTIVE', 'EXPIRING', 'EXPIRED', 'SUSPENDED', 'PENDING']
+const statusOptions = ['All', 'ACTIVE', 'EXPIRING', 'EXPIRED', 'SUSPENDED', 'PENDING_APPROVAL', 'REJECTED']
 const tldFilterOptions = ['All', '.com', '.net', '.org', '.np', '.com.np']
 
 const PortfolioPage = () => {

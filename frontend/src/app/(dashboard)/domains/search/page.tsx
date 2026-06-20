@@ -24,6 +24,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import MenuItem from '@mui/material/MenuItem'
+import Alert from '@mui/material/Alert'
 
 import CustomTextField from '@core/components/mui/TextField'
 import api from '@/lib/api'
@@ -55,6 +56,8 @@ const DomainSearchPage = () => {
   const [ns1, setNs1] = useState('')
   const [ns2, setNs2] = useState('')
   const [registering, setRegistering] = useState(false)
+  const [registerError, setRegisterError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const handleSearch = async () => {
     if (!query.trim()) return
@@ -85,18 +88,25 @@ const DomainSearchPage = () => {
     if (!selectedDomain) return
 
     setRegistering(true)
+    setRegisterError(null)
 
     try {
+      const requested = selectedDomain.domain
       await api.post('/domains/register', {
-        domain: selectedDomain.domain,
+        domainName: selectedDomain.domain,
         years: regYears,
         nameservers: [ns1, ns2].filter(Boolean),
       })
+
+      // Only close + show confirmation after the request is accepted.
       setRegisterOpen(false)
       setSelectedDomain(null)
-      handleSearch()
-    } catch {
-      // silently handle
+      setSuccessMsg(`Request submitted for ${requested} — a Super Admin will review and register it.`)
+    } catch (e: any) {
+      const message = e?.response?.data?.message
+      setRegisterError(
+        Array.isArray(message) ? message.join(', ') : message || 'Failed to submit request. Please try again.'
+      )
     } finally {
       setRegistering(false)
     }
@@ -107,6 +117,8 @@ const DomainSearchPage = () => {
     setRegYears(1)
     setNs1('ns1.hostingnepals.com')
     setNs2('ns2.hostingnepals.com')
+    setRegisterError(null)
+    setSuccessMsg(null)
     setRegisterOpen(true)
   }
 
@@ -122,6 +134,12 @@ const DomainSearchPage = () => {
           </Box>
         </Box>
       </Grid>
+
+      {successMsg && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='success' onClose={() => setSuccessMsg(null)}>{successMsg}</Alert>
+        </Grid>
+      )}
 
       {/* Search Card */}
       <Grid size={{ xs: 12 }}>
@@ -231,7 +249,7 @@ const DomainSearchPage = () => {
                                 variant='contained'
                                 onClick={() => openRegisterDialog(result)}
                               >
-                                Register
+                                Request
                               </Button>
                             ) : (
                               <Button size='small' variant='outlined' disabled>
@@ -252,9 +270,12 @@ const DomainSearchPage = () => {
 
       {/* Registration Dialog */}
       <Dialog open={registerOpen} onClose={() => setRegisterOpen(false)} maxWidth='sm' fullWidth>
-        <DialogTitle>Register {selectedDomain?.domain}</DialogTitle>
+        <DialogTitle>Request {selectedDomain?.domain}</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Alert severity='info'>
+              This submits a registration request. A Super Admin will review and register the domain — you won’t be charged until it’s approved.
+            </Alert>
             <CustomTextField
               select
               label='Registration Period'
@@ -289,16 +310,17 @@ const DomainSearchPage = () => {
             {selectedDomain && (
               <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant='body2'>
-                  Total: NPR {((selectedDomain.price || 0) * regYears).toLocaleString()} for {regYears} {regYears === 1 ? 'year' : 'years'}
+                  Estimated: NPR {((selectedDomain.price || 0) * regYears).toLocaleString()} for {regYears} {regYears === 1 ? 'year' : 'years'} (charged after admin approval)
                 </Typography>
               </Box>
             )}
+            {registerError && <Alert severity='error'>{registerError}</Alert>}
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRegisterOpen(false)}>Cancel</Button>
           <Button variant='contained' onClick={handleRegister} disabled={registering}>
-            {registering ? <CircularProgress size={20} /> : 'Register'}
+            {registering ? <CircularProgress size={20} /> : 'Submit Request'}
           </Button>
         </DialogActions>
       </Dialog>

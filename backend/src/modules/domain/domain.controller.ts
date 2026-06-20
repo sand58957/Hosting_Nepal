@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -21,9 +22,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { DomainService } from './domain.service';
 import { SearchDomainDto, SuggestDomainDto } from './dto/search-domain.dto';
 import { RegisterDomainDto } from './dto/register-domain.dto';
+import { PlaceBidDto } from './dto/place-bid.dto';
 import { AddDnsRecordDto, UpdateDnsRecordDto } from './dto/dns-record.dto';
 import { RenewDomainDto } from './dto/renew-domain.dto';
 import { PortfolioQueryDto, ToggleAutoRenewDto, BulkDomainActionDto } from './dto/portfolio.dto';
@@ -142,7 +146,8 @@ export class DomainController {
     return { success: true, data: result };
   }
 
-  @Post('transfer')
+  // 'transfers' alias matches the frontend's POST /domains/transfers.
+  @Post(['transfer', 'transfers'])
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
@@ -481,6 +486,137 @@ export class DomainController {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // FRONTEND-ALIGNED SERVICE / INVESTOR ROUTES
+  // (list + action endpoints the domain sub-pages call; registered before the
+  //  ':id' routes so the static paths aren't shadowed)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Get('services/broker')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List domain broker requests' })
+  async listBrokerRequests(@Req() req: AuthenticatedRequest) {
+    return { success: true, data: await this.domainService.listBrokerRequests(req.user.id) };
+  }
+
+  @Get('services/negotiate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List domain negotiation requests' })
+  async listNegotiations(@Req() req: AuthenticatedRequest) {
+    return { success: true, data: await this.domainService.listNegotiations(req.user.id) };
+  }
+
+  @Get('services/pre-register/search')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Search domains for pre-registration' })
+  @ApiQuery({ name: 'q', description: 'Domain name to search (without TLD)', example: 'mybusiness' })
+  async searchPreRegister(@Query('q') q?: string) {
+    if (!q?.trim()) {
+      throw new BadRequestException('q is required');
+    }
+    const results = await this.domainService.searchDomains(q.trim(), ['com', 'net', 'org']);
+    return { success: true, data: results };
+  }
+
+  @Get('services/pre-register')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List pre-registration requests' })
+  async listPreRegistrations(@Req() req: AuthenticatedRequest) {
+    return { success: true, data: await this.domainService.listPreRegistrations(req.user.id) };
+  }
+
+  @Post('services/dns-hosting/:id/enable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Enable DNS hosting for a domain' })
+  async enableDnsHostingForDomain(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return { success: true, data: await this.domainService.enableDnsHosting(id, req.user.id) };
+  }
+
+  @Post('services/dns-hosting/:id/disable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Disable DNS hosting for a domain' })
+  async disableDnsHostingForDomain(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return { success: true, data: await this.domainService.disableDnsHosting(id, req.user.id) };
+  }
+
+  @Put('investor/parking/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle parking for a domain' })
+  async toggleParkingForDomain(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: { parkingEnabled?: boolean; enabled?: boolean },
+  ) {
+    if (body?.parkingEnabled === undefined && body?.enabled === undefined) {
+      throw new BadRequestException('parkingEnabled (boolean) is required');
+    }
+    const enabled = body.parkingEnabled ?? body.enabled ?? false;
+    return { success: true, data: await this.domainService.toggleParking(id, req.user.id, enabled) };
+  }
+
+  @Get('investor/afternic')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get Afternic connection status' })
+  async getAfternicStatus(@Req() req: AuthenticatedRequest) {
+    return { success: true, data: await this.domainService.getAfternicStatus(req.user.id) };
+  }
+
+  @Post('investor/afternic/connect')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Connect the Afternic marketplace' })
+  async connectAfternic(@Req() req: AuthenticatedRequest) {
+    return { success: true, data: await this.domainService.connectAfternic(req.user.id) };
+  }
+
+  @Post('investor/auctions/:id/bid')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Place a bid on a domain auction' })
+  async placeAuctionBid(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: PlaceBidDto,
+  ) {
+    return {
+      success: true,
+      data: await this.domainService.placeAuctionBid(id, req.user.id, dto.amount),
+    };
+  }
+
+  @Post('settings/dns-templates/:id/apply')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apply a DNS template to a domain' })
+  async applyDnsTemplateAlias(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: { domainId: string },
+  ) {
+    if (!body?.domainId) {
+      // Without this guard a missing domainId reaches findFirst({id: undefined}),
+      // which silently matches the user's first domain.
+      throw new BadRequestException('domainId is required');
+    }
+    return {
+      success: true,
+      data: await this.domainService.applyDnsTemplate(body.domainId, req.user.id, id),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // DOMAIN REGISTRATION & LISTING (auth required)
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -498,20 +634,72 @@ export class DomainController {
     return { success: true, data: result };
   }
 
-  @Post()
+  // Frontend posts to /domains/register; '' keeps the original POST /domains
+  // working too, so no existing caller breaks.
+  // ANY authenticated user can REQUEST a registration. The real-money NameSilo
+  // purchase only happens when a SUPER_ADMIN approves it below (approval gate,
+  // mirrors VPS).
+  @Post(['', 'register'])
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new domain' })
-  @ApiResponse({ status: 201, description: 'Domain registered successfully' })
+  @ApiOperation({ summary: 'Submit a domain registration request (pending SUPER_ADMIN approval)' })
+  @ApiResponse({ status: 201, description: 'Registration request submitted' })
   @ApiResponse({ status: 400, description: 'Domain not available or invalid input' })
-  @ApiResponse({ status: 409, description: 'Domain already registered in our system' })
-  async registerDomain(
+  @ApiResponse({ status: 409, description: 'Domain already registered or a request is already pending' })
+  async requestDomainRegistration(
     @Req() req: AuthenticatedRequest,
     @Body() dto: RegisterDomainDto,
   ) {
-    const result = await this.domainService.registerDomain(req.user.id, dto);
-    return { success: true, data: result, message: 'Domain registered successfully' };
+    const result = await this.domainService.requestDomainRegistration(req.user.id, dto);
+    return {
+      success: true,
+      data: result,
+      message: 'Registration request submitted — pending admin approval',
+    };
+  }
+
+  // ─── Domain registration approvals (SUPER_ADMIN) ───
+  // Declared before @Get(':id') so the literal path isn't captured by the param route.
+  @Get('admin/registration-requests')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List domain registration requests awaiting approval (SUPER_ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Pending registration requests' })
+  async listPendingDomainRegistrations() {
+    const result = await this.domainService.listPendingDomainRegistrations();
+    return { success: true, data: result };
+  }
+
+  @Post(':id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Approve a pending domain request → registers it (SUPER_ADMIN)' })
+  @ApiParam({ name: 'id', description: 'Domain ID' })
+  @ApiResponse({ status: 200, description: 'Domain approved and registered' })
+  @ApiResponse({ status: 400, description: 'Domain not awaiting approval / no longer available' })
+  async approveDomainRegistration(@Param('id') id: string) {
+    const result = await this.domainService.approveDomainRegistration(id);
+    return { success: true, data: result, message: 'Domain approved and registered' };
+  }
+
+  @Post(':id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reject a pending domain request (SUPER_ADMIN)' })
+  @ApiParam({ name: 'id', description: 'Domain ID' })
+  @ApiResponse({ status: 200, description: 'Domain request rejected' })
+  async rejectDomainRegistration(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+  ) {
+    const result = await this.domainService.rejectDomainRegistration(id, body?.reason);
+    return { success: true, data: result, message: 'Domain request rejected' };
   }
 
   @Get()

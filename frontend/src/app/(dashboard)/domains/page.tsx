@@ -43,6 +43,9 @@ const statusColorMap: Record<string, 'success' | 'warning' | 'error' | 'default'
   ACTIVE: 'success',
   EXPIRING: 'warning',
   EXPIRED: 'error',
+  PENDING_APPROVAL: 'warning',
+  PENDING_REGISTRATION: 'warning',
+  REJECTED: 'error',
 }
 
 const DomainDashboardPage = () => {

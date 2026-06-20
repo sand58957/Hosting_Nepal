@@ -28,9 +28,11 @@ enum DomainStatus {
   ACTIVE
   EXPIRED
   SUSPENDED
+  PENDING_APPROVAL
   PENDING_REGISTRATION
   PENDING_TRANSFER
   PENDING_DELETION
+  REJECTED
   DELETED
 }
 
@@ -312,6 +314,10 @@ model User {
   authorTitle                 String?      @map("author_title") @db.VarChar(255)
   authorBio                   String?      @map("author_bio") @db.Text
   avatarUrl                   String?      @map("avatar_url") @db.VarChar(500)
+  isFree                      Boolean      @default(false) @map("is_free")
+  freeSince                   DateTime?    @map("free_since")
+  freeReason                  String?      @map("free_reason") @db.VarChar(500)
+  freeGrantedBy               String?      @map("free_granted_by") @db.Uuid
   createdAt                   DateTime     @default(now()) @map("created_at")
   updatedAt                   DateTime     @updatedAt @map("updated_at")
 
@@ -333,6 +339,7 @@ model User {
   @@index([rcCustomerId])
   @@index([status])
   @@index([authorSlug])
+  @@index([isFree])
   @@map("users")
 }
 
@@ -351,6 +358,7 @@ model Domain {
   nameservers         Json?        @default("[]")
   dnsRecords          Json?        @default("[]") @map("dns_records")
   whoisContactId      String?      @map("whois_contact_id") @db.VarChar(100)
+  requestMeta         Json?        @map("request_meta")
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 

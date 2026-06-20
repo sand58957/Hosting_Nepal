@@ -1,7 +1,7 @@
 // Type Imports
 import type { VerticalMenuDataType } from '@/types/menuTypes'
 
-const verticalMenuData = (): VerticalMenuDataType[] => [
+const verticalMenuData = (role?: string): VerticalMenuDataType[] => [
   {
     label: 'Dashboard',
     icon: 'tabler-layout-dashboard',
@@ -30,7 +30,17 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
         label: 'Dedicated Analytics',
         href: '/dashboard/dedicated',
         icon: 'tabler-server-bolt'
-      }
+      },
+      // SUPER_ADMIN-only: native error-tracking dashboard (GlitchTip-backed).
+      ...(role === 'SUPER_ADMIN'
+        ? [
+            {
+              label: 'Error Tracking',
+              href: '/dashboard/error-tracking',
+              icon: 'tabler-bug'
+            }
+          ]
+        : [])
     ]
   },
   {
@@ -51,6 +61,16 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
             href: '/domains/search',
             icon: 'tabler-search'
           },
+          // SUPER_ADMIN-only: approve pending domain registration requests
+          ...(role === 'SUPER_ADMIN'
+            ? [
+                {
+                  label: 'Domain Approvals',
+                  href: '/domains/approvals',
+                  icon: 'tabler-checks'
+                }
+              ]
+            : []),
           {
             label: 'Portfolio',
             href: '/domains/portfolio',
@@ -371,6 +391,21 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
                 href: '/vps/order',
                 icon: 'tabler-shopping-cart'
               },
+              // SUPER_ADMIN-only: approve pending VPS requests + view all user servers
+              ...(role === 'SUPER_ADMIN'
+                ? [
+                    {
+                      label: 'VPS Approvals',
+                      href: '/vps/approvals',
+                      icon: 'tabler-checks'
+                    },
+                    {
+                      label: 'All Servers (Admin)',
+                      href: '/vps/all-servers',
+                      icon: 'tabler-server-bolt'
+                    }
+                  ]
+                : []),
               {
                 label: 'Upgrade VPS',
                 href: '/vps/upgrade',

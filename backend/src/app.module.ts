@@ -18,6 +18,7 @@ import { ResellerModule } from './modules/reseller/reseller.module';
 import { BlogModule } from './modules/blog/blog.module';
 import { BlogGeneratorModule } from './modules/blog-generator/blog-generator.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { HealthModule } from './modules/health/health.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 
@@ -97,6 +98,7 @@ import databaseConfig from './config/database.config';
     BlogModule,
     BlogGeneratorModule,
     StorageModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
