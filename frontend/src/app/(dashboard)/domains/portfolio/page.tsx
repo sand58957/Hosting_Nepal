@@ -68,7 +68,18 @@ const PortfolioPage = () => {
       try {
         const res = await api.get('/domains/portfolio')
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
-        setDomains(Array.isArray(raw?.domains) ? raw.domains : Array.isArray(raw) ? raw : [])
+        const list = Array.isArray(raw?.domains) ? raw.domains : Array.isArray(raw) ? raw : []
+        // Backend returns Prisma rows (domainName / theftProtection / privacyProtection);
+        // normalize to the shape this page renders (name / locked / privacy) so
+        // d.name.toLowerCase() etc. don't crash.
+        setDomains(
+          list.map((d: any) => ({
+            ...d,
+            name: d.name ?? d.domainName ?? '',
+            locked: d.locked ?? d.theftProtection ?? false,
+            privacy: d.privacy ?? d.privacyProtection ?? false,
+          })),
+        )
       } catch {
         // silently handle
       } finally {
