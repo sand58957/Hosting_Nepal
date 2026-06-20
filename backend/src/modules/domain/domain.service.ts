@@ -19,6 +19,7 @@ import {
   NameSiloService,
   NameSiloApiError,
 } from './services/namesilo.service';
+import { CloudflareDnsService } from './services/cloudflare.service';
 import { RegisterDomainDto } from './dto/register-domain.dto';
 import { AddDnsRecordDto, UpdateDnsRecordDto } from './dto/dns-record.dto';
 import { InitiateTransferDto } from './dto/transfer.dto';
@@ -62,6 +63,7 @@ export class DomainService {
   constructor(
     private readonly resellerClub: ResellerClubService,
     private readonly nameSilo: NameSiloService,
+    private readonly cloudflareDns: CloudflareDnsService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
@@ -873,11 +875,29 @@ export class DomainService {
    * Get all DNS records for a domain.
    * Uses NameSilo as primary, falls back to ResellerClub for legacy domains.
    */
+  /**
+   * Domains whose nameservers point to Cloudflare are managed via the Cloudflare
+   * API (NameSilo is no longer authoritative for them). Falls back to NameSilo
+   * when CF isn't configured or the domain isn't on Cloudflare.
+   */
+  private useCloudflare(nameservers: unknown): boolean {
+    return (
+      this.cloudflareDns.isConfigured() &&
+      CloudflareDnsService.isCloudflareNameservers(nameservers)
+    );
+  }
+
   async getDnsRecords(
     domainId: string,
     userId: string,
   ): Promise<DnsRecord[]> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      this.logger.debug(`Fetching DNS records from Cloudflare for ${domain.domainName}`);
+
+      return this.cloudflareDns.listRecords(domain.domainName);
+    }
 
     try {
       // Primary: NameSilo
@@ -931,6 +951,18 @@ export class DomainService {
     dto: AddDnsRecordDto,
   ): Promise<{ success: boolean; message: string }> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      await this.cloudflareDns.createRecord(domain.domainName, {
+        type: dto.type,
+        host: dto.host,
+        value: dto.value,
+        ttl: dto.ttl,
+        priority: dto.priority,
+      });
+
+      return { success: true, message: `${dto.type} record added via Cloudflare` };
+    }
 
     // NameSilo uses subdomain-only host (e.g. "www" not "www.domain.com")
     const host = dto.host.replace(`.${domain.domainName}`, '').replace(/\.$/, '');
@@ -990,6 +1022,18 @@ export class DomainService {
     dto: UpdateDnsRecordDto,
   ): Promise<{ success: boolean; message: string }> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      await this.cloudflareDns.updateRecord(domain.domainName, recordId, {
+        type: dto.type,
+        host: dto.host,
+        value: dto.value,
+        ttl: dto.ttl,
+        priority: dto.priority,
+      });
+
+      return { success: true, message: 'DNS record updated via Cloudflare' };
+    }
 
     // NameSilo uses subdomain-only host (e.g. "www" not "www.domain.com")
     const host = dto.host
@@ -1056,6 +1100,12 @@ export class DomainService {
     recordId: string,
   ): Promise<{ success: boolean; message: string }> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      await this.cloudflareDns.deleteRecord(domain.domainName, recordId);
+
+      return { success: true, message: 'DNS record deleted via Cloudflare' };
+    }
 
     try {
       // Primary: NameSilo — recordId is the NameSilo record_id

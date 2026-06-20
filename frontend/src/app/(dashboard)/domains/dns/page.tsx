@@ -306,7 +306,16 @@ const DnsManagementPage = () => {
       {/* DNS Records Table */}
       <Grid size={{ xs: 12 }}>
         <Card>
-          <CardHeader title='DNS Records' />
+          <CardHeader
+            title='DNS Records'
+            subheader={
+              (domains.find((d) => d.id === selectedDomain)?.nameservers ?? []).some((ns) =>
+                ns.toLowerCase().includes('cloudflare.com'),
+              )
+                ? 'Managed via Cloudflare — these are your live Cloudflare records.'
+                : undefined
+            }
+          />
           <CardContent>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
