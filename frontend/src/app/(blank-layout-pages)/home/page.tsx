@@ -116,6 +116,7 @@ const fallbackPlans: Plan[] = [
   { id: 'vps-plus-16', name: 'Cloud VPS Plus 16', type: 'VPS_PLUS', priceMonthly: 17670, priceYearly: 176700, currency: 'NPR', features: [], specs: { diskGB: 750, cpuCores: 16, ramGB: 64 }, },
   { id: 'vps-plus-18', name: 'Cloud VPS Plus 18', type: 'VPS_PLUS', priceMonthly: 22134, priceYearly: 221340, currency: 'NPR', features: [], specs: { diskGB: 900, cpuCores: 18, ramGB: 96 }, },
   { id: 'storage-vps-10', name: 'Storage VPS 10', type: 'STORAGE_VPS', priceMonthly: 1228, priceYearly: 12280, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 2, ramGB: 4 }, },
+  { id: 'storage-vps-20', name: 'Storage VPS 20', type: 'STORAGE_VPS', priceMonthly: 1674, priceYearly: 16740, currency: 'NPR', features: [], specs: { diskGB: 400, cpuCores: 3, ramGB: 8 }, popular: true },
   { id: 'storage-vps-30', name: 'Storage VPS 30', type: 'STORAGE_VPS', priceMonthly: 3125, priceYearly: 31250, currency: 'NPR', features: [], specs: { diskGB: 1000, cpuCores: 6, ramGB: 18 }, },
   { id: 'storage-vps-40', name: 'Storage VPS 40', type: 'STORAGE_VPS', priceMonthly: 5580, priceYearly: 55800, currency: 'NPR', features: [], specs: { diskGB: 1200, cpuCores: 8, ramGB: 30 }, },
   { id: 'storage-vps-50', name: 'Storage VPS 50', type: 'STORAGE_VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 1400, cpuCores: 14, ramGB: 50 }, },
@@ -504,10 +505,11 @@ const HomePage = () => {
   const visiblePlans = filteredPlans.slice(0, 5)
 
   const specLabels = [
-    { key: 'cpu', label: 'vCPU Cores', icon: 'tabler-cpu' },
-    { key: 'ram', label: 'RAM (GB)', icon: 'tabler-device-desktop' },
-    { key: 'disk', label: 'NVMe SSD (GB)', icon: 'tabler-device-sd-card' },
-    { key: 'bandwidth', label: 'Traffic', icon: 'tabler-arrows-transfer-up' },
+    { key: 'cpu', label: 'CPU', icon: 'tabler-cpu' },
+    { key: 'ram', label: 'RAM', icon: 'tabler-device-desktop' },
+    { key: 'disk', label: 'Storage', icon: 'tabler-device-sd-card' },
+    { key: 'port', label: 'Port', icon: 'tabler-network' },
+    { key: 'bandwidth', label: 'Data Transfer', icon: 'tabler-arrows-transfer-up' },
   ]
 
   const infraMap: Record<string, { cpu: number; ram: number; nvme: number; bw: string }> = {
@@ -521,15 +523,36 @@ const HomePage = () => {
     'wp-enterprise': { cpu: 16, ram: 64, nvme: 300, bw: '1 Gbit/s' },
   }
 
+  // Port speed per plan — exact Contabo values
+  const portMap: Record<string, string> = {
+    'vps-10': '200 Mbit/s', 'vps-20': '300 Mbit/s', 'vps-30': '600 Mbit/s',
+    'vps-40': '800 Mbit/s', 'vps-50': '1 Gbit/s', 'vps-60': '1 Gbit/s',
+    'vps-plus-4': '500 Mbit/s', 'vps-plus-6': '500 Mbit/s', 'vps-plus-8': '1 Gbit/s',
+    'vps-plus-12': '1 Gbit/s', 'vps-plus-16': '1 Gbit/s', 'vps-plus-18': '1 Gbit/s',
+    'storage-vps-10': '200 Mbit/s', 'storage-vps-20': '300 Mbit/s', 'storage-vps-30': '600 Mbit/s',
+    'storage-vps-40': '800 Mbit/s', 'storage-vps-50': '1 Gbit/s',
+    'vds-s': '250 Mbit/s', 'vds-m': '500 Mbit/s', 'vds-l': '750 Mbit/s',
+    'vds-xl': '1 Gbit/s', 'vds-xxl': '1 Gbit/s',
+  }
+
   const getSpec = (plan: Plan, key: string) => {
     const s: Record<string, any> = plan.specs || {}
     const slug = plan.name?.toLowerCase().replace(/\s+/g, '-')
     const infra = infraMap[plan.id] || infraMap[slug]
 
-    if (key === 'cpu') return `${infra?.cpu || s.cpuCores || s.cpu || '—'} vCPU`
+    if (key === 'cpu') {
+      const n = infra?.cpu || s.cpuCores || s.cpu || '—'
+      return plan.type === 'VDS' ? `${n} Virtual Cores` : `${n} vCPU Cores`
+    }
     if (key === 'ram') return `${infra?.ram || s.ramGB || s.ram || '—'} GB`
-    if (key === 'disk') return `${infra?.nvme || s.diskGB || s.disk || s.storage || '—'} GB`
-    if (key === 'bandwidth') return infra?.bw || s.bandwidth || 'Unlimited'
+    if (key === 'disk') {
+      const gb = infra?.nvme || s.diskGB || s.disk || s.storage || 0
+      const size = gb >= 1000 ? `${gb / 1000} TB` : `${gb} GB`
+      const media = plan.type === 'VPS_PLUS' || plan.type === 'VDS' ? 'NVMe' : 'SSD'
+      return gb ? `${size} ${media}` : '—'
+    }
+    if (key === 'port') return portMap[plan.id] || infra?.bw || s.bandwidth || '—'
+    if (key === 'bandwidth') return 'Unlimited Traffic'
     return '—'
   }
 

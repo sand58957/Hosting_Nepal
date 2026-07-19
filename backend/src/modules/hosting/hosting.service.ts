@@ -76,6 +76,7 @@ const CONTABO_PRODUCT_MAP: Record<string, { contaboProductId: string; name: stri
   'vps-plus-18': { contaboProductId: 'V164', name: 'Cloud VPS Plus 18' }, // 18c/96GB/900GB NVMe
   // Storage VPS (SSD, storage-optimised) — verified via GET /v1/products.
   'storage-vps-10': { contaboProductId: 'V93', name: 'Storage VPS 10' }, // 2c/4GB/300GB SSD
+  'storage-vps-20': { contaboProductId: 'V96', name: 'Storage VPS 20' }, // 3c/8GB/400GB SSD
   'storage-vps-30': { contaboProductId: 'V99', name: 'Storage VPS 30' }, // 6c/18GB/1TB SSD
   'storage-vps-40': { contaboProductId: 'V102', name: 'Storage VPS 40' }, // 8c/30GB/1.2TB SSD
   'storage-vps-50': { contaboProductId: 'V105', name: 'Storage VPS 50' }, // 14c/50GB/1.4TB SSD
@@ -304,10 +305,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(6.60) * 10,
     currency: 'NPR',
     features: [
-      '4 vCPU',
+      '4 vCPU Cores',
       '8 GB RAM',
       '100 GB SSD',
-      '200 Mbit/s Bandwidth',
+      '200 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -332,10 +333,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(9.00) * 10,
     currency: 'NPR',
     features: [
-      '6 vCPU',
+      '6 vCPU Cores',
       '12 GB RAM',
       '200 GB SSD',
-      '300 Mbit/s Bandwidth',
+      '300 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -361,10 +362,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(16.80) * 10,
     currency: 'NPR',
     features: [
-      '8 vCPU',
+      '8 vCPU Cores',
       '24 GB RAM',
       '300 GB SSD',
-      '600 Mbit/s Bandwidth',
+      '600 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -389,10 +390,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(30.00) * 10,
     currency: 'NPR',
     features: [
-      '12 vCPU',
+      '12 vCPU Cores',
       '48 GB RAM',
       '400 GB SSD',
-      '800 Mbit/s Bandwidth',
+      '800 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -417,10 +418,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(44.50) * 10,
     currency: 'NPR',
     features: [
-      '16 vCPU',
+      '16 vCPU Cores',
       '64 GB RAM',
       '500 GB SSD',
-      '1 Gbit/s Bandwidth',
+      '1 Gbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -445,10 +446,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(58.80) * 10,
     currency: 'NPR',
     features: [
-      '18 vCPU',
+      '18 vCPU Cores',
       '96 GB RAM',
       '600 GB SSD',
-      '1 Gbit/s Bandwidth',
+      '1 Gbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -465,7 +466,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(16.25), // Contabo Cloud VPS Plus 4 (V159) 12-mo $13.00 → NPR 3023
     priceYearly: applyContaboUsd(16.25) * 10,
     currency: 'NPR',
-    features: ['4 vCPU (AMD EPYC)', '8 GB RAM', '150 GB NVMe', '500 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    features: ['4 vCPU Cores (AMD EPYC)', '8 GB RAM', '150 GB NVMe', '500 Mbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
   },
   {
     id: 'vps-plus-6',
@@ -475,7 +476,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(23.00), // Contabo Cloud VPS Plus 6 (V160) 12-mo $18.40 → NPR 4278
     priceYearly: applyContaboUsd(23.00) * 10,
     currency: 'NPR',
-    features: ['6 vCPU (AMD EPYC)', '12 GB RAM', '300 GB NVMe', '500 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    features: ['6 vCPU Cores (AMD EPYC)', '12 GB RAM', '300 GB NVMe', '500 Mbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
     popular: true,
   },
   {
@@ -486,7 +487,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(42.00), // Contabo Cloud VPS Plus 8 (V161) 12-mo $33.60 → NPR 7812
     priceYearly: applyContaboUsd(42.00) * 10,
     currency: 'NPR',
-    features: ['8 vCPU (AMD EPYC)', '24 GB RAM', '450 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    features: ['8 vCPU Cores (AMD EPYC)', '24 GB RAM', '450 GB NVMe', '1 Gbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
   },
   {
     id: 'vps-plus-12',
@@ -496,7 +497,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(71.00), // Contabo Cloud VPS Plus 12 (V162) 12-mo $56.80 → NPR 13206
     priceYearly: applyContaboUsd(71.00) * 10,
     currency: 'NPR',
-    features: ['12 vCPU (AMD EPYC)', '48 GB RAM', '600 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    features: ['12 vCPU Cores (AMD EPYC)', '48 GB RAM', '600 GB NVMe', '1 Gbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
   },
   {
     id: 'vps-plus-16',
@@ -506,7 +507,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(95.00), // Contabo Cloud VPS Plus 16 (V163) 12-mo $76.00 → NPR 17670
     priceYearly: applyContaboUsd(95.00) * 10,
     currency: 'NPR',
-    features: ['16 vCPU (AMD EPYC)', '64 GB RAM', '750 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    features: ['16 vCPU Cores (AMD EPYC)', '64 GB RAM', '750 GB NVMe', '1 Gbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
   },
   {
     id: 'vps-plus-18',
@@ -516,7 +517,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(119.00), // Contabo Cloud VPS Plus 18 (V164) 12-mo $95.20 → NPR 22134
     priceYearly: applyContaboUsd(119.00) * 10,
     currency: 'NPR',
-    features: ['18 vCPU (AMD EPYC)', '96 GB RAM', '900 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    features: ['18 vCPU Cores (AMD EPYC)', '96 GB RAM', '900 GB NVMe', '1 Gbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
   },
   // ── Storage VPS (Contabo) ───────────────────────────────────────────────────
   {
@@ -536,16 +537,45 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(6.60) * 10,
     currency: 'NPR',
     features: [
-      '2 vCPU',
+      '2 vCPU Cores',
       '4 GB RAM',
       '300 GB SSD',
-      '200 Mbit/s Bandwidth',
+      '200 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
       'DDoS Protection',
       'Contabo Cloud',
     ],
+  },
+  {
+    id: 'storage-vps-20',
+    name: 'Storage VPS 20',
+    type: 'STORAGE_VPS',
+    specs: {
+      diskGB: 400,
+      bandwidthGB: -1,
+      emailAccounts: 0,
+      subdomains: 0,
+      databases: 0,
+      cpuCores: 3,
+      ramGB: 8,
+    },
+    priceMonthly: applyContaboUsd(9.00), // Contabo Storage VPS 20 (V96) 12-mo $7.20 → NPR 1674
+    priceYearly: applyContaboUsd(9.00) * 10,
+    currency: 'NPR',
+    features: [
+      '3 vCPU Cores',
+      '8 GB RAM',
+      '400 GB SSD',
+      '300 Mbit/s Port', 'Unlimited Traffic',
+      '1 Dedicated IPv4',
+      'Full Root Access',
+      'KVM Virtualization',
+      'DDoS Protection',
+      'Contabo Cloud',
+    ],
+    popular: true,
   },
   {
     id: 'storage-vps-30',
@@ -564,10 +594,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(16.80) * 10,
     currency: 'NPR',
     features: [
-      '6 vCPU',
+      '6 vCPU Cores',
       '18 GB RAM',
-      '1000 GB SSD',
-      '600 Mbit/s Bandwidth',
+      '1 TB SSD',
+      '600 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -592,10 +622,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(30.00) * 10,
     currency: 'NPR',
     features: [
-      '8 vCPU',
+      '8 vCPU Cores',
       '30 GB RAM',
-      '1200 GB SSD',
-      '800 Mbit/s Bandwidth',
+      '1.2 TB SSD',
+      '800 Mbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -620,10 +650,10 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceYearly: applyContaboUsd(44.50) * 10,
     currency: 'NPR',
     features: [
-      '14 vCPU',
+      '14 vCPU Cores',
       '50 GB RAM',
-      '1400 GB SSD',
-      '1 Gbit/s Bandwidth',
+      '1.4 TB SSD',
+      '1 Gbit/s Port', 'Unlimited Traffic',
       '1 Dedicated IPv4',
       'Full Root Access',
       'KVM Virtualization',
@@ -640,7 +670,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(47.00), // Contabo Cloud VDS S 12-mo $37.60 → NPR 8742
     priceYearly: applyContaboUsd(47.00) * 10,
     currency: 'NPR',
-    features: ['6 Dedicated Cores (AMD EPYC 7282)', '24 GB RAM', '180 GB NVMe SSD', '250 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
+    features: ['6 Virtual Cores (AMD EPYC 7282 2.8 GHz)', '24 GB RAM', '180 GB NVMe', '250 Mbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
   },
   {
     id: 'vds-m',
@@ -650,7 +680,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(59.00), // Contabo Cloud VDS M 12-mo $47.20 → NPR 10974
     priceYearly: applyContaboUsd(59.00) * 10,
     currency: 'NPR',
-    features: ['8 Dedicated Cores (AMD EPYC 7282)', '32 GB RAM', '240 GB NVMe SSD', '500 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
+    features: ['8 Virtual Cores (AMD EPYC 7282 2.8 GHz)', '32 GB RAM', '240 GB NVMe', '500 Mbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
     popular: true,
   },
   {
@@ -661,7 +691,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(83.00), // Contabo Cloud VDS L 12-mo $66.40 → NPR 15438
     priceYearly: applyContaboUsd(83.00) * 10,
     currency: 'NPR',
-    features: ['12 Dedicated Cores (AMD EPYC 7282)', '48 GB RAM', '360 GB NVMe SSD', '750 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
+    features: ['12 Virtual Cores (AMD EPYC 7282 2.8 GHz)', '48 GB RAM', '360 GB NVMe', '750 Mbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
   },
   {
     id: 'vds-xl',
@@ -671,7 +701,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(113.00), // Contabo Cloud VDS XL 12-mo $90.40 → NPR 21018
     priceYearly: applyContaboUsd(113.00) * 10,
     currency: 'NPR',
-    features: ['16 Dedicated Cores (AMD EPYC 7282)', '64 GB RAM', '480 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Priority Support', 'Contabo Cloud'],
+    features: ['16 Virtual Cores (AMD EPYC 7282 2.8 GHz)', '64 GB RAM', '480 GB NVMe', '1 Gbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Priority Support', 'Contabo Cloud'],
   },
   {
     id: 'vds-xxl',
@@ -681,7 +711,7 @@ const HOSTING_PLANS: HostingPlan[] = [
     priceMonthly: applyContaboUsd(167.00), // Contabo Cloud VDS XXL 12-mo $133.60 → NPR 31062
     priceYearly: applyContaboUsd(167.00) * 10,
     currency: 'NPR',
-    features: ['24 Dedicated Cores (AMD EPYC 7282)', '96 GB RAM', '720 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Priority Support', 'Contabo Cloud'],
+    features: ['24 Virtual Cores (AMD EPYC 7282 2.8 GHz)', '96 GB RAM', '720 GB NVMe', '1 Gbit/s Port', 'Unlimited Traffic', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Priority Support', 'Contabo Cloud'],
   },
   // ── Dedicated Servers ─────────────────────────────────────────────────────────
   {

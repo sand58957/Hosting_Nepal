@@ -107,6 +107,7 @@ const VPSOrderPage = () => {
         // Storage VPS specs (SSD-only, storage-optimised)
         const storageSpecs: Record<string, { snapshots: number; bandwidth: string }> = {
           'storage-vps-10': { snapshots: 0, bandwidth: '200 Mbit/s' },
+          'storage-vps-20': { snapshots: 0, bandwidth: '300 Mbit/s' },
           'storage-vps-30': { snapshots: 0, bandwidth: '600 Mbit/s' },
           'storage-vps-40': { snapshots: 0, bandwidth: '800 Mbit/s' },
           'storage-vps-50': { snapshots: 0, bandwidth: '1 Gbit/s' },
@@ -199,6 +200,7 @@ const VPSOrderPage = () => {
         ])
         setStoragePlans([
           { id: 'storage-vps-10', name: 'Storage VPS 10', cpu: 2, ram: 4, disk: 300, diskSsd: 0, snapshots: 0, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280, isStorage: true },
+          { id: 'storage-vps-20', name: 'Storage VPS 20', cpu: 3, ram: 8, disk: 400, diskSsd: 0, snapshots: 0, bandwidth: '300 Mbit/s', price: 1674, priceYearly: 16740, isStorage: true, popular: true },
           { id: 'storage-vps-30', name: 'Storage VPS 30', cpu: 6, ram: 18, disk: 1000, diskSsd: 0, snapshots: 0, bandwidth: '600 Mbit/s', price: 3125, priceYearly: 31250, isStorage: true },
           { id: 'storage-vps-40', name: 'Storage VPS 40', cpu: 8, ram: 30, disk: 1200, diskSsd: 0, snapshots: 0, bandwidth: '800 Mbit/s', price: 5580, priceYearly: 55800, isStorage: true },
           { id: 'storage-vps-50', name: 'Storage VPS 50', cpu: 14, ram: 50, disk: 1400, diskSsd: 0, snapshots: 0, bandwidth: '1 Gbit/s', price: 8277, priceYearly: 82770, isStorage: true },
@@ -283,7 +285,7 @@ const VPSOrderPage = () => {
             {[
               { icon: 'tabler-cpu', label: `${plan.cpu} vCPU Cores`, sub: undefined as string | undefined },
               { icon: 'tabler-device-desktop-analytics', label: `${plan.ram} GB RAM`, sub: undefined as string | undefined },
-              { icon: 'tabler-database', label: `${plan.disk} GB ${plan.diskType || 'SSD'}`, sub: undefined as string | undefined },
+              { icon: 'tabler-database', label: `${plan.disk >= 1000 ? `${plan.disk / 1000} TB` : `${plan.disk} GB`} ${plan.diskType || 'SSD'}`, sub: undefined as string | undefined },
               { icon: 'tabler-camera', label: `${plan.snapshots ?? 0} Snapshot${(plan.snapshots ?? 0) === 1 ? '' : 's'}`, sub: undefined as string | undefined },
               { icon: 'tabler-network', label: `${plan.bandwidth || '200 Mbit/s'} Port`, sub: undefined as string | undefined },
               { icon: 'tabler-transfer', label: 'Unlimited Traffic', sub: undefined as string | undefined },

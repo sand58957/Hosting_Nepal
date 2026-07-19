@@ -216,7 +216,7 @@ const VDSOrderPage = () => {
                   {/* Specs Table - Contabo Style */}
                   <Box sx={{ px: 0 }}>
                     {[
-                      { icon: 'tabler-cpu', label: `${plan.cpu} Physical Cores`, sub: plan.processor },
+                      { icon: 'tabler-cpu', label: `${plan.cpu} Virtual Cores`, sub: plan.processor },
                       { icon: 'tabler-device-desktop-analytics', label: `${plan.ram} GB RAM` },
                       { icon: 'tabler-database', label: `${plan.disk} GB NVMe`, sub: 'More storage available' },
                       { icon: 'tabler-network', label: `${plan.bandwidth} Port` },
