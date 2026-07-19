@@ -13,12 +13,13 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next()
 
-  // s-maxage: CDN edge keeps for 5 min
-  // stale-while-revalidate: serve stale up to 1h while fetching fresh in background
+  // s-maxage: CDN edge keeps for 1 min
+  // stale-while-revalidate: serve stale up to 5 min while fetching fresh in background
+  // — keeps deploys visible within ~6 min instead of up to an hour.
   // Browser still revalidates on each visit (max-age=0) — only the edge caches
   response.headers.set(
     'Cache-Control',
-    'public, max-age=0, s-maxage=300, stale-while-revalidate=3600',
+    'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
   )
 
   return response
