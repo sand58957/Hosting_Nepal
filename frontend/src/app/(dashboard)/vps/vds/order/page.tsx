@@ -44,11 +44,13 @@ const osOptions = [
   'Windows Server 2022',
 ]
 
+// Contract terms — no discount: total = monthly price × months. `cycle` maps to
+// the backend BillingCycle enum sent on order.
 const billingOptions = [
-  { value: 'monthly', label: 'Monthly', multiplier: 1 },
-  { value: 'quarterly', label: 'Quarterly (5% off)', multiplier: 2.85 },
-  { value: 'semiannual', label: 'Semi-Annual (10% off)', multiplier: 5.4 },
-  { value: 'yearly', label: 'Yearly (15% off)', multiplier: 10.2 },
+  { value: 'monthly', label: 'Monthly (1 month)', months: 1, cycle: 'MONTHLY' },
+  { value: 'quarterly', label: 'Quarterly (3 months)', months: 3, cycle: 'QUARTERLY' },
+  { value: 'halfyearly', label: 'Half-Yearly (6 months)', months: 6, cycle: 'HALF_YEARLY' },
+  { value: 'yearly', label: 'Yearly (12 months)', months: 12, cycle: 'YEARLY' },
 ]
 
 const VDSOrderPage = () => {
@@ -102,11 +104,11 @@ const VDSOrderPage = () => {
         setPlans(vdsPlans)
       } catch {
         setPlans([
-          { id: 'vds-s', name: 'VDS S', cpu: 3, ram: 24, disk: 180, bandwidth: '250 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 6110, priceYearly: 61100 },
-          { id: 'vds-m', name: 'VDS M', cpu: 4, ram: 32, disk: 240, bandwidth: '500 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 7957, priceYearly: 79570, popular: true },
-          { id: 'vds-l', name: 'VDS L', cpu: 6, ram: 48, disk: 360, bandwidth: '750 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 11367, priceYearly: 113670 },
-          { id: 'vds-xl', name: 'VDS XL', cpu: 8, ram: 64, disk: 480, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 14635, priceYearly: 146350 },
-          { id: 'vds-xxl', name: 'VDS XXL', cpu: 12, ram: 96, disk: 720, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 21135, priceYearly: 211350 },
+          { id: 'vds-s', name: 'VDS S', cpu: 3, ram: 24, disk: 180, bandwidth: '250 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 8631, priceYearly: 86310 },
+          { id: 'vds-m', name: 'VDS M', cpu: 4, ram: 32, disk: 240, bandwidth: '500 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 10268, priceYearly: 102680, popular: true },
+          { id: 'vds-l', name: 'VDS L', cpu: 6, ram: 48, disk: 360, bandwidth: '750 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 15476, priceYearly: 154760 },
+          { id: 'vds-xl', name: 'VDS XL', cpu: 8, ram: 64, disk: 480, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 20535, priceYearly: 205350 },
+          { id: 'vds-xxl', name: 'VDS XXL', cpu: 12, ram: 96, disk: 720, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 29016, priceYearly: 290160 },
         ])
       } finally {
         setLoadingPlans(false)
@@ -117,7 +119,7 @@ const VDSOrderPage = () => {
   }, [])
 
   const billingOption = billingOptions.find((b) => b.value === billing) || billingOptions[0]
-  const totalPrice = selectedPlan ? Math.round(selectedPlan.price * billingOption.multiplier) : 0
+  const totalPrice = selectedPlan ? Math.round(selectedPlan.price * billingOption.months) : 0
 
   const handleDeploy = async () => {
     if (!selectedPlan || !hostname.trim() || !rootPassword) return
@@ -129,7 +131,7 @@ const VDSOrderPage = () => {
         os,
         sshKey: sshKey || undefined,
         rootPassword,
-        billingCycle: billing,
+        billingCycle: billingOption.cycle,
         containerStack: containerStack !== 'none' ? containerStack : undefined,
       })
       router.push('/vps')

@@ -15,7 +15,12 @@ const GoogleIcon = () => (
 
 const GoogleSignInButton = ({ label = 'Continue with Google' }: { label?: string }) => {
   const handleClick = () => {
-    window.location.href = `${API_URL}/auth/google`
+    // Generate CSRF state token for OAuth security
+    const state = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+    sessionStorage.setItem('oauth_state', state)
+    window.location.href = `${API_URL}/auth/google?state=${encodeURIComponent(state)}`
   }
 
   return (

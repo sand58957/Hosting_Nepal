@@ -61,8 +61,12 @@ const SSLPage = () => {
   const fetchCertificates = async () => {
     try {
       const response = await api.get('/ssl')
-      const data = response.data.data
-      setCertificates(Array.isArray(data?.certificates) ? data.certificates : Array.isArray(data) ? data : [])
+      // SSL controller returns { success, data: [...] } and the interceptor wraps
+      // it again, so the array lives at response.data.data.data.
+      const body = response.data?.data ?? response.data
+      setCertificates(
+        Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : Array.isArray(body?.certificates) ? body.certificates : []
+      )
     } catch {
       // silently handle
     } finally {

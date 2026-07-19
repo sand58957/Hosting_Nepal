@@ -51,6 +51,7 @@ const BackupsPage = () => {
   const [selectedSite, setSelectedSite] = useState('')
   const [backups, setBackups] = useState<Backup[]>([])
   const [loading, setLoading] = useState(true)
+  const [backupsLoading, setBackupsLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [restoreFile, setRestoreFile] = useState('')
@@ -73,12 +74,15 @@ const BackupsPage = () => {
   }, [])
 
   const fetchBackups = async (siteId: string) => {
+    setBackupsLoading(true)
     try {
       const res = await api.get(`/hosting/websites/${siteId}/backups`)
       const raw = res.data?.data?.data ?? res.data?.data ?? res.data
       setBackups(Array.isArray(raw) ? raw : [])
     } catch {
       setBackups([])
+    } finally {
+      setBackupsLoading(false)
     }
   }
 
@@ -133,7 +137,7 @@ const BackupsPage = () => {
               </Select>
             </FormControl>
 
-            {loading ? (
+            {loading || backupsLoading ? (
               <Skeleton height={200} />
             ) : backups.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>

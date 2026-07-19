@@ -168,7 +168,7 @@ const PlansPage = () => {
 
                           {/* Plan Features */}
                           <Box>
-                            {plan.features.map((feature, idx) => (
+                            {(plan.features ?? []).map((feature, idx) => (
                               <Box
                                 key={idx}
                                 sx={{
@@ -176,7 +176,7 @@ const PlansPage = () => {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   py: 1.2,
-                                  borderBottom: idx < plan.features.length - 1 ? '1px solid' : 'none',
+                                  borderBottom: idx < (plan.features?.length ?? 0) - 1 ? '1px solid' : 'none',
                                   borderColor: 'divider',
                                 }}
                               >

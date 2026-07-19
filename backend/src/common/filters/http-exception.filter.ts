@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/node';
 
 interface ExceptionResponse {
   message?: string | string[];
@@ -66,6 +67,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     };
 
     if (status >= 500) {
+      // Only capture UNEXPECTED server errors to GlitchTip (no-op when
+      // SENTRY_DSN is unset). Deliberately-thrown 5xx HttpExceptions (e.g.
+      // ServiceUnavailableException from the /health probe during a DB outage)
+      // are logged but not captured, to avoid flooding GlitchTip.
+      if (!(exception instanceof HttpException)) {
+        Sentry.captureException(exception, {
+          tags: { path: request.url, method: request.method },
+        });
+      }
       this.logger.error(
         `${request.method} ${request.url} ${status}`,
         JSON.stringify(errorResponse),

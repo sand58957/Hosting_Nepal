@@ -35,6 +35,7 @@ const VPSVncPage = () => {
   const [selectedServer, setSelectedServer] = useState('')
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [error, setError] = useState('')
   const [vncEnabled, setVncEnabled] = useState(false)
   const [vncInfo, setVncInfo] = useState<{ host: string; port: number; password: string }>({
     host: '',
@@ -49,10 +50,11 @@ const VPSVncPage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch servers:', err)
         setServers([])
       } finally {
         setLoading(false)
@@ -74,30 +76,18 @@ const VPSVncPage = () => {
     }
   }
 
-  const handleToggleVnc = async () => {
-    if (!selectedServer) return
-    setActionLoading('toggle')
-    try {
-      await api.post(`/hosting/vps/${selectedServer}/vnc`, { enabled: !vncEnabled })
-      setVncEnabled(!vncEnabled)
-    } catch {
-      // silently handle
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
   const handleResetVncPassword = async () => {
     if (!selectedServer) return
     setActionLoading('reset')
+    setError('')
     try {
-      const res = await api.post(`/hosting/vps/${selectedServer}/vnc/password-reset`)
+      const res = await api.post(`/hosting/vps/${selectedServer}/vnc/password`)
       const raw = res.data?.data?.data ?? res.data?.data ?? res.data
       if (raw?.password) {
         setVncInfo((prev) => ({ ...prev, password: raw.password }))
       }
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to reset VNC password. Please try again.')
     } finally {
       setActionLoading(null)
     }
@@ -115,6 +105,12 @@ const VPSVncPage = () => {
           </Typography>
         </Box>
       </Grid>
+
+      {error && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
+        </Grid>
+      )}
 
       <Grid size={{ xs: 12 }}>
         <Card>
@@ -150,11 +146,7 @@ const VPSVncPage = () => {
                   <Typography variant='h6'>Connection Info</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant='body2'>VNC</Typography>
-                    <Switch
-                      checked={vncEnabled}
-                      onChange={handleToggleVnc}
-                      disabled={actionLoading === 'toggle'}
-                    />
+                    <Switch checked={vncEnabled} disabled />
                     <Chip
                       label={vncEnabled ? 'Enabled' : 'Disabled'}
                       color={vncEnabled ? 'success' : 'default'}

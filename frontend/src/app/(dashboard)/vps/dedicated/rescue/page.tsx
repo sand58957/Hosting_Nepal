@@ -65,7 +65,9 @@ const DedicatedRescuePage = () => {
       setRescueActive(!!currentServer.rescueMode)
       setRescueCredentials(null)
     }
-  }, [selectedServer])
+    // depend on servers too: currentServer is derived from it and is undefined
+    // until the /hosting fetch resolves.
+  }, [selectedServer, servers])
 
   const handleToggleRescue = async () => {
     if (!selectedServer) return
@@ -73,8 +75,8 @@ const DedicatedRescuePage = () => {
     setError('')
     setSuccess('')
     try {
-      const action = rescueActive ? 'disable' : 'enable'
-      const res = await api.post(`/hosting/vps/${selectedServer}/rescue`, { action })
+      // Backend ToggleRescueDto expects { enabled: boolean } (not { action }).
+      const res = await api.post(`/hosting/vps/${selectedServer}/rescue`, { enabled: !rescueActive })
       const data = res.data?.data ?? res.data
 
       if (!rescueActive) {

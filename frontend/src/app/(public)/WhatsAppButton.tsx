@@ -11,7 +11,15 @@ const WhatsAppButton = () => {
   useEffect(() => {
     fetch(`${API_URL}/site-config`).then(r => r.json()).then(d => {
       const data = d?.data ?? d
-      if (data?.whatsappNumber) setConfig(data)
+      // Merge field-by-field onto the defaults so a payload missing one key
+      // (e.g. whatsappEnabled) doesn't blow away the others or coerce to undefined.
+      if (data && typeof data === 'object') {
+        setConfig(prev => ({
+          whatsappNumber: data.whatsappNumber ?? prev.whatsappNumber,
+          whatsappMessage: data.whatsappMessage ?? prev.whatsappMessage,
+          whatsappEnabled: typeof data.whatsappEnabled === 'boolean' ? data.whatsappEnabled : prev.whatsappEnabled,
+        }))
+      }
     }).catch(() => {})
   }, [])
 

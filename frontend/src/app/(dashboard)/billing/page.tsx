@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -69,6 +69,7 @@ const tabParamMap: Record<string, number> = { orders: 0, invoices: 1, wallet: 2 
 
 const BillingPageInner = () => {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const tabParam = searchParams.get('tab')
   const [currentTab, setCurrentTab] = useState(tabParam ? (tabParamMap[tabParam] ?? 0) : 0)
   const [orders, setOrders] = useState<Order[]>([])
@@ -80,25 +81,30 @@ const BillingPageInner = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [ordersRes, invoicesRes] = await Promise.allSettled([
+        const [ordersRes, invoicesRes, paymentsRes, walletRes] = await Promise.allSettled([
           api.get('/billing/orders'),
           api.get('/billing/invoices'),
+          api.get('/billing/payments'),
+          api.get('/billing/wallet/balance'),
         ])
 
-        if (ordersRes.status === 'fulfilled') {
-          const data = ordersRes.value.data.data
-          setOrders(Array.isArray(data?.orders) ? data.orders : Array.isArray(data) ? data : [])
-          if (data?.walletBalance !== undefined) {
-            setWalletBalance(data.walletBalance)
-          }
+        // Orders/invoices/payments are paginated ({ data: [...], meta }) and the
+        // global interceptor wraps the body once more, so the rows live at
+        // res.data.data.data. Wallet + payments have their OWN endpoints — they
+        // are NOT carried on the orders/invoices payloads.
+        const rows = (r: PromiseSettledResult<any>): any[] => {
+          if (r.status !== 'fulfilled') return []
+          const body = r.value.data?.data ?? r.value.data
+          return Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : []
         }
 
-        if (invoicesRes.status === 'fulfilled') {
-          const data = invoicesRes.value.data.data
-          setInvoices(Array.isArray(data?.invoices) ? data.invoices : Array.isArray(data) ? data : [])
-          if (data?.payments) {
-            setPayments(Array.isArray(data.payments) ? data.payments : [])
-          }
+        setOrders(rows(ordersRes))
+        setInvoices(rows(invoicesRes))
+        setPayments(rows(paymentsRes))
+
+        if (walletRes.status === 'fulfilled') {
+          const w = walletRes.value.data?.data ?? walletRes.value.data
+          setWalletBalance(typeof w?.balance === 'number' ? w.balance : 0)
         }
       } catch {
         // silently handle
@@ -264,7 +270,11 @@ const BillingPageInner = () => {
                                 {invoice.paidAt ? new Date(invoice.paidAt).toLocaleDateString() : '-'}
                               </TableCell>
                               <TableCell>
-                                <Button size='small' variant='outlined'>
+                                <Button
+                                  size='small'
+                                  variant='outlined'
+                                  onClick={() => router.push(`/billing/invoices/${invoice.id}`)}
+                                >
                                   View
                                 </Button>
                               </TableCell>

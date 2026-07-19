@@ -49,6 +49,7 @@ const VDSPasswordResetPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -78,13 +79,14 @@ const VDSPasswordResetPage = () => {
     if (!canReset) return
     setResetting(true)
     setSuccess(false)
+    setError('')
     try {
-      await api.post(`/hosting/vps/${selectedServer}/password-reset`, { password: newPassword })
+      await api.post(`/hosting/vps/${selectedServer}/password`, { newPassword })
       setNewPassword('')
       setConfirmPassword('')
       setSuccess(true)
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to reset password. Please try again.')
     } finally {
       setResetting(false)
     }
@@ -111,7 +113,7 @@ const VDSPasswordResetPage = () => {
                 select
                 label='Select VDS Server'
                 value={selectedServer}
-                onChange={(e) => { setSelectedServer(e.target.value); setSuccess(false) }}
+                onChange={(e) => { setSelectedServer(e.target.value); setSuccess(false); setError('') }}
                 fullWidth
               >
                 {servers.length === 0 ? (
@@ -164,6 +166,12 @@ const VDSPasswordResetPage = () => {
               <Alert severity='success'>
                 Password has been reset successfully. The VDS is restarting to apply the new password.
               </Alert>
+            </Grid>
+          )}
+
+          {error && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
             </Grid>
           )}
 

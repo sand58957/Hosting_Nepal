@@ -3,12 +3,14 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { HostingStatus, HostingProvider } from '@prisma/client';
+import { computeExpiry } from '../hosting-billing.util';
 import { CyberPanelService } from '../services/cyberpanel.service';
 import { ProxmoxService } from '../services/proxmox.service';
 import { ContaboService } from '../services/contabo.service';
 import { DockerService } from '../services/docker.service';
 import { ResellerClubService } from '../../domain/services/resellerclub.service';
 import { PrismaService } from '../../../database/prisma.service';
+import { HostingService } from '../hosting.service';
 import { ProvisioningJob, VpsProvisioningJob } from '../interfaces/hosting.interface';
 
 const OS_TEMPLATE_MAP: Record<string, number> = {
@@ -33,7 +35,27 @@ export class ProvisioningProcessor {
     private readonly resellerClub: ResellerClubService,
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly hostingService: HostingService,
   ) {}
+
+  /**
+   * Daily repeatable (registered by HostingService.onModuleInit): email clients
+   * whose VPS/VDS contract expires within 7 days. Delegates to the service sweep.
+   */
+  @Process('expiry-reminder')
+  async handleExpiryReminder(): Promise<void> {
+    const { reminded } = await this.hostingService.runExpiryReminderSweep();
+    this.logger.log(`expiry-reminder job done: ${reminded} reminder(s) sent`);
+  }
+
+  /** Contract-term expiry = now + the account's billing term (provision time). */
+  private async computeExpiryForAccount(hostingId: string): Promise<Date> {
+    const acc = await this.prisma.hostingAccount.findUnique({
+      where: { id: hostingId },
+      select: { billingCycle: true },
+    });
+    return computeExpiry(new Date(), acc?.billingCycle ?? 'MONTHLY');
+  }
 
   @Process('provision-shared')
   async handleProvisionShared(job: Job<ProvisioningJob>): Promise<void> {
@@ -200,6 +222,7 @@ export class ProvisioningProcessor {
           serverId: String(vmId),
           ipAddress,
           provisionedAt: new Date(),
+          expiryDate: await this.computeExpiryForAccount(hostingId),
         },
       });
 
@@ -209,6 +232,9 @@ export class ProvisioningProcessor {
         type: 'vps',
         vmId,
         ipAddress,
+        // Reinstall reuses this job (isReinstall flag set by the service); pass it
+        // through so the email listener can skip the full "VPS ready" welcome.
+        isReinstall: (job.data as { isReinstall?: boolean }).isReinstall === true,
       });
       this.logger.log(
         `VPS provisioned successfully: ${hostingId} (vmId=${vmId}, ip=${ipAddress})`,
@@ -369,6 +395,7 @@ export class ProvisioningProcessor {
           rcOrderId: String(rcResponse.entityid || rcResponse),
           provider: HostingProvider.RESELLERCLUB,
           provisionedAt: new Date(),
+          expiryDate: await this.computeExpiryForAccount(hostingId),
         },
       });
 
@@ -410,17 +437,86 @@ export class ProvisioningProcessor {
       region: string;
       displayName?: string;
       rootPassword?: number;
+      sshKeyPlain?: string | null;
+      rootPasswordPlain?: string | null;
       containerStack?: string;
     }>,
   ): Promise<void> {
-    const { hostingId, productId, imageId, region, displayName, rootPassword, containerStack } =
-      job.data;
+    const {
+      hostingId,
+      productId,
+      imageId,
+      region,
+      displayName,
+      sshKeyPlain,
+      rootPasswordPlain,
+      containerStack,
+    } = job.data;
+    let { rootPassword } = job.data;
 
     this.logger.log(
       `Provisioning VPS via Contabo [${hostingId}] productId: ${productId}, region: ${region}`,
     );
 
     try {
+      // Idempotency guard: if this hosting row already has a provider instance id
+      // (serverId) or is already ACTIVE, a previous run already provisioned the
+      // (paid) VM. Re-running createInstance would create a SECOND billable VM,
+      // so short-circuit instead.
+      const current = await this.prisma.hostingAccount.findUnique({
+        where: { id: hostingId },
+        select: { serverId: true, status: true },
+      });
+      if (current?.serverId || current?.status === HostingStatus.ACTIVE) {
+        this.logger.warn(
+          `Contabo provisioning for ${hostingId} skipped: already provisioned ` +
+            `(serverId=${current?.serverId ?? 'none'}, status=${current?.status})`,
+        );
+        return;
+      }
+
+      // Contabo takes credentials as SECRET IDs, not raw values. Convert the
+      // customer's order inputs into secrets so their chosen root password and
+      // SSH key are actually installed on the VM.
+      let sshKeyIds: number[] | undefined;
+      const shortId = hostingId.slice(0, 8);
+      // Contabo wraps responses as {data:[{...}]}; tolerate flat shapes too.
+      const extractSecretId = (sec: any): number | undefined => {
+        const resp = sec?.data?.[0] ?? sec?.data ?? sec;
+        const id = resp?.secretId;
+        return id ? Number(id) : undefined;
+      };
+      if (rootPasswordPlain && !rootPassword) {
+        try {
+          const sec = await this.contabo.createSecret(`hn-${shortId}-pw`, rootPasswordPlain, 'password');
+          rootPassword = extractSecretId(sec);
+          if (!rootPassword) {
+            this.logger.warn(
+              `Contabo password secret for ${hostingId}: could not extract secretId from response ${JSON.stringify(sec).slice(0, 200)}`,
+            );
+          }
+        } catch (e) {
+          this.logger.warn(
+            `Contabo password secret failed for ${hostingId} (${(e as Error).message}); VM will use an auto-generated password`,
+          );
+        }
+      }
+      if (sshKeyPlain) {
+        try {
+          const sec = await this.contabo.createSecret(`hn-${shortId}-ssh`, sshKeyPlain.trim(), 'ssh');
+          const secId = extractSecretId(sec);
+          if (secId) sshKeyIds = [secId];
+          else
+            this.logger.warn(
+              `Contabo ssh secret for ${hostingId}: could not extract secretId from response ${JSON.stringify(sec).slice(0, 200)}`,
+            );
+        } catch (e) {
+          this.logger.warn(
+            `Contabo ssh secret failed for ${hostingId} (${(e as Error).message}); key will not be installed`,
+          );
+        }
+      }
+
       // Generate cloud-init userData if a container stack was requested
       const userData = containerStack && containerStack !== 'none'
         ? this.dockerService.getInstallScriptForType(containerStack) || undefined
@@ -432,6 +528,7 @@ export class ProvisioningProcessor {
         region,
         displayName,
         rootPassword,
+        sshKeys: sshKeyIds,
         period: 1,
         userData,
       });
@@ -439,13 +536,63 @@ export class ProvisioningProcessor {
       // Extract instance data from Contabo response
       const instanceData = result?.data?.[0] || result?.data || result;
       const contaboInstanceId = instanceData?.instanceId || instanceData?.computeInstanceId;
-      const ipAddress =
+      let ipAddress =
         instanceData?.ipConfig?.v4?.ip ||
         instanceData?.ipv4 ||
         (instanceData?.ipConfig?.v4Addresses?.[0]?.ip) ||
         null;
+      let ipv6 = instanceData?.ipConfig?.v6?.ip || null;
+      let defaultUser = instanceData?.defaultUser || null;
 
-      // Store metadata indicating this is a Contabo instance
+      // Persist the Contabo instance id IMMEDIATELY — before the long
+      // waitForInstanceReady poll. If the worker dies (or the job retries) during
+      // the poll, the idempotency guard above will see this serverId and refuse to
+      // create a second billable VM.
+      if (contaboInstanceId) {
+        await this.prisma.hostingAccount.update({
+          where: { id: hostingId },
+          data: {
+            serverId: String(contaboInstanceId),
+            status: HostingStatus.PROVISIONING,
+          },
+        });
+      }
+
+      // The create response usually has no IP yet (instance still installing) — wait
+      // for it to come up so we capture the assigned IPv4 for the dashboard.
+      if (contaboInstanceId && !ipAddress) {
+        try {
+          const ready = await this.contabo.waitForInstanceReady(Number(contaboInstanceId));
+          ipAddress =
+            ready?.ipConfig?.v4?.ip ||
+            ready?.ipv4 ||
+            ready?.ipConfig?.v4Addresses?.[0]?.ip ||
+            null;
+          ipv6 = ready?.ipConfig?.v6?.ip || ipv6;
+          defaultUser = ready?.defaultUser || defaultUser;
+        } catch (e) {
+          this.logger.warn(
+            `Contabo ${contaboInstanceId}: waitForInstanceReady failed (${(e as Error).message}); IP will sync later`,
+          );
+        }
+      }
+
+      // Store metadata indicating this is a Contabo instance. Deliberately REPLACE
+      // the pending-request blob (it held the plaintext order credentials), but
+      // preserve a pendingUpgrade marker if one was added meanwhile.
+      let carriedUpgrade: Record<string, unknown> | undefined;
+      try {
+        const existing = await this.prisma.hostingAccount.findUnique({
+          where: { id: hostingId },
+          select: { cpanelPasswordEncrypted: true },
+        });
+        const parsed = existing?.cpanelPasswordEncrypted
+          ? JSON.parse(existing.cpanelPasswordEncrypted)
+          : null;
+        if (parsed?.pendingUpgrade) carriedUpgrade = parsed.pendingUpgrade;
+      } catch {
+        // non-JSON or missing — nothing to carry over
+      }
       const meta = JSON.stringify({
         providerType: 'contabo',
         contaboInstanceId,
@@ -453,6 +600,7 @@ export class ProvisioningProcessor {
         region,
         containerStack: containerStack || 'none',
         createdAt: new Date().toISOString(),
+        ...(carriedUpgrade ? { pendingUpgrade: carriedUpgrade } : {}),
       });
 
       await this.prisma.hostingAccount.update({
@@ -463,6 +611,7 @@ export class ProvisioningProcessor {
           ipAddress: ipAddress || undefined,
           cpanelPasswordEncrypted: meta,
           provisionedAt: new Date(),
+          expiryDate: await this.computeExpiryForAccount(hostingId),
         },
       });
 
@@ -472,6 +621,9 @@ export class ProvisioningProcessor {
         type: 'vps-contabo',
         instanceId: contaboInstanceId,
         ipAddress,
+        ipv6,
+        defaultUser,
+        sshKeyInstalled: !!sshKeyIds?.length,
       });
       this.logger.log(
         `Contabo VPS provisioned successfully: ${hostingId} (instanceId=${contaboInstanceId}, ip=${ipAddress})`,
@@ -482,10 +634,17 @@ export class ProvisioningProcessor {
         (error as Error).stack,
       );
 
+      // Terminal failure: move to a clear needs-attention state (SUSPENDED) and
+      // NULL the pending-request blob. That blob holds BOTH the plaintext order
+      // credentials (purge them — see #4) AND awaitingApproval:true. If we left it
+      // and reset to PENDING_SETUP, the failed request would silently re-enter the
+      // approval queue and a re-approval would create ANOTHER paid VM (see #1).
+      // TODO: encrypt pending VPS request blob (at-rest encryption is a larger change)
       await this.prisma.hostingAccount.update({
         where: { id: hostingId },
         data: {
-          status: HostingStatus.PENDING_SETUP,
+          status: HostingStatus.SUSPENDED,
+          cpanelPasswordEncrypted: null,
         },
       });
 

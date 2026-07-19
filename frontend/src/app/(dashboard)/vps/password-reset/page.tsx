@@ -49,6 +49,7 @@ const VPSPasswordResetPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -57,7 +58,7 @@ const VPSPasswordResetPage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
       } catch {
@@ -78,13 +79,14 @@ const VPSPasswordResetPage = () => {
     if (!canReset) return
     setResetting(true)
     setSuccess(false)
+    setError('')
     try {
-      await api.post(`/hosting/vps/${selectedServer}/password-reset`, { password: newPassword })
+      await api.post(`/hosting/vps/${selectedServer}/password`, { newPassword })
       setNewPassword('')
       setConfirmPassword('')
       setSuccess(true)
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to reset password. Please try again.')
     } finally {
       setResetting(false)
     }
@@ -111,7 +113,7 @@ const VPSPasswordResetPage = () => {
                 select
                 label='Select Server'
                 value={selectedServer}
-                onChange={(e) => { setSelectedServer(e.target.value); setSuccess(false) }}
+                onChange={(e) => { setSelectedServer(e.target.value); setSuccess(false); setError('') }}
                 fullWidth
               >
                 {servers.map((s) => (
@@ -160,6 +162,12 @@ const VPSPasswordResetPage = () => {
               <Alert severity='success'>
                 Password has been reset successfully. The server is restarting to apply the new password.
               </Alert>
+            </Grid>
+          )}
+
+          {error && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
             </Grid>
           )}
 

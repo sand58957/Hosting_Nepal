@@ -79,6 +79,10 @@ const ForgotPassword = ({ mode }: { mode: SystemMode }) => {
     setLoading(true)
 
     try {
+      // Any 2xx response means the request was accepted. The backend
+      // deliberately returns the same response whether or not the email exists
+      // (anti-enumeration), so always show the neutral message on success.
+      // Failures (4xx/5xx) reject and are handled in the catch block below.
       await api.post('/auth/forgot-password', { email })
       setSuccess('If an account with that email exists, we have sent a password reset link.')
     } catch (err: unknown) {

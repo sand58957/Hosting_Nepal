@@ -64,4 +64,41 @@ export class BillingEmailListener {
       },
     );
   }
+
+  @OnEvent('billing.payment-reminder', { async: true })
+  async onPaymentReminder(payload: {
+    user: { email: string; firstName: string };
+    totalDueNpr: number;
+    daysLeft: number;
+    services: Array<{ name: string; paidUntil?: string | null; amountNpr: number }>;
+  }): Promise<void> {
+    try {
+      await this.mailService.sendPaymentReminder(payload.user, {
+        totalDueNpr: payload.totalDueNpr,
+        daysLeft: payload.daysLeft,
+        services: payload.services,
+      });
+    } catch (e) {
+      this.logger.warn(`payment-reminder email failed: ${(e as Error).message}`);
+    }
+  }
+
+  @OnEvent('billing.suspension-warning', { async: true })
+  async onSuspensionWarning(payload: {
+    user: { email: string; firstName: string };
+    totalDueNpr: number;
+    graceDays: number;
+    services: Array<{ name: string; paidUntil?: string | null; amountNpr: number }>;
+  }): Promise<void> {
+    try {
+      await this.mailService.sendSuspensionWarning(payload.user, {
+        totalDueNpr: payload.totalDueNpr,
+        graceDays: payload.graceDays,
+        services: payload.services,
+        reactivationFeeNpr: 1000,
+      });
+    } catch (e) {
+      this.logger.warn(`suspension-warning email failed: ${(e as Error).message}`);
+    }
+  }
 }

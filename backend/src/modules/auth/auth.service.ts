@@ -176,7 +176,9 @@ export class AuthService {
     this.eventEmitter.emit('auth.login', {
       userId: user.id,
       email: user.email,
+      name: user.name,
       ip,
+      previousIp: user.lastLoginIp,
     });
 
     this.logger.log(`User logged in: ${user.email}`);
@@ -299,7 +301,9 @@ export class AuthService {
     this.eventEmitter.emit('auth.login', {
       userId: user.id,
       email: user.email,
+      name: user.name,
       ip,
+      previousIp: user.lastLoginIp,
       provider: 'google',
     });
 
@@ -471,6 +475,7 @@ export class AuthService {
     this.eventEmitter.emit('auth.password-reset', {
       userId: user.id,
       email: user.email,
+      name: user.name,
     });
 
     this.logger.log(`Password reset completed for: ${user.email}`);
@@ -664,6 +669,13 @@ export class AuthService {
       data: { twoFactorEnabled: true },
     });
 
+    this.eventEmitter.emit('auth.2fa-changed', {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      enabled: true,
+    });
+
     this.logger.log(`2FA enabled for user: ${user.email}`);
 
     return { message: 'Two-factor authentication has been enabled.' };
@@ -706,6 +718,13 @@ export class AuthService {
         twoFactorEnabled: false,
         twoFactorSecret: null,
       },
+    });
+
+    this.eventEmitter.emit('auth.2fa-changed', {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      enabled: false,
     });
 
     this.logger.log(`2FA disabled for user: ${user.email}`);

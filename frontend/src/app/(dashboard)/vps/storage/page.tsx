@@ -45,6 +45,8 @@ const VPSStoragePage = () => {
   const [selectedAddon, setSelectedAddon] = useState<StorageAddon | null>(null)
   const [loading, setLoading] = useState(true)
   const [extending, setExtending] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -53,10 +55,11 @@ const VPSStoragePage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch servers:', err)
         setServers([])
       } finally {
         setLoading(false)
@@ -73,14 +76,16 @@ const VPSStoragePage = () => {
   const handleExtend = async () => {
     if (!selectedServer || !selectedAddon) return
     setExtending(true)
+    setError('')
+    setSuccess('')
     try {
-      await api.post(`/hosting/vps/${selectedServer}/storage/extend`, {
-        addonId: selectedAddon.id,
-        size: selectedAddon.size,
+      await api.post(`/hosting/vps/${selectedServer}/storage`, {
+        additionalGB: selectedAddon.size,
       })
+      setSuccess('Storage extension requested.')
       setSelectedAddon(null)
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to extend storage. Please try again.')
     } finally {
       setExtending(false)
     }
@@ -96,6 +101,18 @@ const VPSStoragePage = () => {
           </Typography>
         </Box>
       </Grid>
+
+      {error && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
+        </Grid>
+      )}
+
+      {success && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='success' onClose={() => setSuccess('')}>{success}</Alert>
+        </Grid>
+      )}
 
       <Grid size={{ xs: 12 }}>
         <Card>

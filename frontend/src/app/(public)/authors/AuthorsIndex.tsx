@@ -97,7 +97,7 @@ const AuthorsIndex = () => {
                 >
                   <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     <Avatar src={a.avatarUrl || undefined} sx={{ width: 72, height: 72, bgcolor: '#28C76F', fontSize: 28, fontWeight: 700 }}>
-                      {a.name.charAt(0)}
+                      {a.name?.charAt(0) || 'A'}
                     </Avatar>
                     <Typography variant='h6' fontWeight={700} sx={{ color: '#fff' }}>{a.name}</Typography>
                     {a.title && (
@@ -122,7 +122,7 @@ const AuthorsIndex = () => {
       {/* Footer */}
       <Box sx={{ bgcolor: '#131325', py: 4, textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.3)' }}>
-          {new Date().getFullYear()} &copy; Marketnminds Investment Group
+          {new Date().getFullYear()} &copy; Marketminds Investment Group
         </Typography>
       </Box>
     </Box>

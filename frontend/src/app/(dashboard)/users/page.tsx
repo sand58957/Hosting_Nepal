@@ -29,9 +29,11 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import MenuItem from '@mui/material/MenuItem'
 import LinearProgress from '@mui/material/LinearProgress'
+import Checkbox from '@mui/material/Checkbox'
 
 import CustomTextField from '@core/components/mui/TextField'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/auth.store'
 
 interface User {
   id: string
@@ -40,6 +42,7 @@ interface User {
   phone: string | null
   role: string
   status: string
+  isFree?: boolean
   emailVerified: boolean
   createdAt: string
   lastLoginAt: string | null
@@ -96,6 +99,28 @@ const UsersPage = () => {
   const emptyCreate = { name: '', email: '', phone: '', password: '', role: 'CUSTOMER', status: 'ACTIVE', companyName: '' }
   const [createForm, setCreateForm] = useState(emptyCreate)
 
+  // Auth — the "Make free" action is SUPER_ADMIN-only (backend enforces it too).
+  // Gate on `authMounted` so the button reliably appears after the persisted auth
+  // store rehydrates on the client (avoids an SSR/first-paint flash).
+  const currentUser = useAuthStore(s => s.user)
+  const [authMounted, setAuthMounted] = useState(false)
+  useEffect(() => { setAuthMounted(true) }, [])
+  const isSuperAdmin = authMounted && currentUser?.role === 'SUPER_ADMIN'
+
+  // Make-free dialog state
+  const [freeOpen, setFreeOpen] = useState(false)
+  const [freeUser, setFreeUser] = useState<User | null>(null)
+  const [freeReason, setFreeReason] = useState('')
+  const [freeSaving, setFreeSaving] = useState(false)
+
+  // Bulk make-free state (SUPER_ADMIN)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkMode, setBulkMode] = useState<'selected' | 'all-customers'>('selected')
+  const [bulkGrant, setBulkGrant] = useState(true)
+  const [bulkReason, setBulkReason] = useState('')
+  const [bulkSaving, setBulkSaving] = useState(false)
+
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
@@ -144,6 +169,74 @@ const UsersPage = () => {
       setErrorMsg('Failed to update user')
       setTimeout(() => setErrorMsg(null), 4000)
     } finally { setDialogSaving(false) }
+  }
+
+  const openFreeDialog = (user: User) => {
+    setFreeUser(user)
+    setFreeReason('')
+    setFreeOpen(true)
+  }
+
+  const handleToggleFree = async () => {
+    if (!freeUser) return
+    setFreeSaving(true)
+    const grant = !freeUser.isFree
+    try {
+      await api.patch(`/admin/users/${freeUser.id}/free`, {
+        isFree: grant,
+        ...(grant && freeReason.trim() ? { reason: freeReason.trim() } : {}),
+      })
+      setSuccessMsg(grant ? `${freeUser.name} is now free (billing-exempt)` : `Removed free status from ${freeUser.name}`)
+      setTimeout(() => setSuccessMsg(null), 3000)
+      setFreeOpen(false)
+      fetchUsers()
+    } catch {
+      setErrorMsg('Failed to update free status')
+      setTimeout(() => setErrorMsg(null), 4000)
+    } finally { setFreeSaving(false) }
+  }
+
+  // ── Bulk make-free helpers ──
+  const isStaff = (u: User) => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN'
+  const selectableOnPage = users.filter(u => !isStaff(u))
+  const allPageSelected = selectableOnPage.length > 0 && selectableOnPage.every(u => selectedIds.has(u.id))
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const toggleSelectAllPage = () => setSelectedIds(prev => {
+    const next = new Set(prev)
+    if (allPageSelected) selectableOnPage.forEach(u => next.delete(u.id))
+    else selectableOnPage.forEach(u => next.add(u.id))
+    return next
+  })
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const openBulk = (mode: 'selected' | 'all-customers', grant: boolean) => {
+    setBulkMode(mode); setBulkGrant(grant); setBulkReason(''); setBulkOpen(true)
+  }
+
+  const handleBulkFree = async () => {
+    setBulkSaving(true)
+    try {
+      const payload: Record<string, any> = { isFree: bulkGrant }
+      if (bulkMode === 'all-customers') payload.scope = 'ALL_CUSTOMERS'
+      else payload.userIds = Array.from(selectedIds)
+      if (bulkGrant && bulkReason.trim()) payload.reason = bulkReason.trim()
+      const res = await api.post('/admin/users/bulk-free', payload)
+      const d = res.data?.data ?? res.data
+      setSuccessMsg(`${bulkGrant ? 'Made free' : 'Removed free from'} ${d?.updated ?? 0} user(s)${d?.skipped ? `, ${d.skipped} skipped` : ''}`)
+      setTimeout(() => setSuccessMsg(null), 4000)
+      setBulkOpen(false)
+      clearSelection()
+      fetchUsers()
+      api.get('/admin/users-analytics').then(r => setAnalytics(r.data?.data ?? r.data)).catch(() => {})
+    } catch {
+      setErrorMsg('Bulk update failed')
+      setTimeout(() => setErrorMsg(null), 4000)
+    } finally { setBulkSaving(false) }
   }
 
   const resetCreateForm = () => {
@@ -305,13 +398,25 @@ const UsersPage = () => {
           <CardHeader
             title='User Management'
             action={
-              <Button
-                variant='contained'
-                startIcon={<i className='tabler-user-plus' />}
-                onClick={() => { resetCreateForm(); setCreateOpen(true) }}
-              >
-                Create User
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {isSuperAdmin && (
+                  <Button
+                    variant='outlined'
+                    color='success'
+                    startIcon={<i className='tabler-gift' />}
+                    onClick={() => openBulk('all-customers', true)}
+                  >
+                    Free All Customers
+                  </Button>
+                )}
+                <Button
+                  variant='contained'
+                  startIcon={<i className='tabler-user-plus' />}
+                  onClick={() => { resetCreateForm(); setCreateOpen(true) }}
+                >
+                  Create User
+                </Button>
+              </Box>
             }
           />
           <CardContent>
@@ -330,6 +435,17 @@ const UsersPage = () => {
               />
             </Box>
 
+            {isSuperAdmin && selectedIds.size > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, p: 1.5, borderRadius: 1, bgcolor: 'action.hover', flexWrap: 'wrap' }}>
+                <Typography variant='body2' fontWeight={600}>{selectedIds.size} selected</Typography>
+                <Button size='small' variant='contained' color='success' startIcon={<i className='tabler-gift' />}
+                  onClick={() => openBulk('selected', true)}>Make free</Button>
+                <Button size='small' variant='outlined' color='warning' startIcon={<i className='tabler-gift-off' />}
+                  onClick={() => openBulk('selected', false)}>Remove free</Button>
+                <Button size='small' color='inherit' onClick={clearSelection}>Clear</Button>
+              </Box>
+            )}
+
             {loading ? (
               <Box>{[...Array(5)].map((_, i) => <Skeleton key={i} height={55} sx={{ mb: 0.5 }} />)}</Box>
             ) : users.length === 0 ? (
@@ -343,6 +459,14 @@ const UsersPage = () => {
                   <Table>
                     <TableHead>
                       <TableRow>
+                        {isSuperAdmin && (
+                          <TableCell padding='checkbox'>
+                            <Checkbox size='small'
+                              checked={allPageSelected}
+                              indeterminate={!allPageSelected && selectableOnPage.some(u => selectedIds.has(u.id))}
+                              onChange={toggleSelectAllPage} />
+                          </TableCell>
+                        )}
                         <TableCell>User</TableCell>
                         <TableCell>Role</TableCell>
                         <TableCell>Status</TableCell>
@@ -354,7 +478,15 @@ const UsersPage = () => {
                     </TableHead>
                     <TableBody>
                       {users.map(user => (
-                        <TableRow key={user.id} hover>
+                        <TableRow key={user.id} hover selected={selectedIds.has(user.id)}>
+                          {isSuperAdmin && (
+                            <TableCell padding='checkbox'>
+                              <Checkbox size='small'
+                                checked={selectedIds.has(user.id)}
+                                disabled={isStaff(user)}
+                                onChange={() => toggleSelect(user.id)} />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                               <Avatar sx={{ width: 36, height: 36, bgcolor: roleColors[user.role] === 'error' ? 'error.main' : roleColors[user.role] === 'warning' ? 'warning.main' : 'primary.main', fontSize: 14 }}>
@@ -372,8 +504,14 @@ const UsersPage = () => {
                               onClick={() => openDialog(user, 'role')} sx={{ cursor: 'pointer' }} />
                           </TableCell>
                           <TableCell>
-                            <Chip label={user.status} size='small' color={statusColors[user.status] || 'default'} variant='outlined'
-                              onClick={() => openDialog(user, 'status')} sx={{ cursor: 'pointer' }} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                              <Chip label={user.status} size='small' color={statusColors[user.status] || 'default'} variant='outlined'
+                                onClick={() => openDialog(user, 'status')} sx={{ cursor: 'pointer' }} />
+                              {user.isFree && (
+                                <Chip label='FREE' size='small' color='success'
+                                  icon={<i className='tabler-gift' style={{ fontSize: 14 }} />} title='Billing-exempt (free) user' />
+                              )}
+                            </Box>
                           </TableCell>
                           <TableCell>
                             {user.emailVerified
@@ -395,6 +533,14 @@ const UsersPage = () => {
                                 color={user.status === 'SUSPENDED' ? 'success' : 'default'}>
                                 <i className={user.status === 'SUSPENDED' ? 'tabler-user-check' : 'tabler-user-pause'} style={{ fontSize: 18 }} />
                               </IconButton>
+                              {isSuperAdmin && (
+                                <IconButton size='small'
+                                  title={user.isFree ? 'Remove free status' : 'Make user free'}
+                                  onClick={() => openFreeDialog(user)}
+                                  color={user.isFree ? 'success' : 'default'}>
+                                  <i className={user.isFree ? 'tabler-gift-off' : 'tabler-gift'} style={{ fontSize: 18 }} />
+                                </IconButton>
+                              )}
                             </Box>
                           </TableCell>
                         </TableRow>
@@ -530,6 +676,65 @@ const UsersPage = () => {
           <Button onClick={() => setDialogOpen(false)} color='inherit'>Cancel</Button>
           <Button onClick={handleDialogSave} variant='contained' disabled={dialogSaving}>
             {dialogSaving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Make-free Dialog (SUPER_ADMIN only) */}
+      <Dialog open={freeOpen} onClose={() => !freeSaving && setFreeOpen(false)} maxWidth='xs' fullWidth>
+        <DialogTitle>{freeUser?.isFree ? 'Remove Free Status' : 'Make User Free'}</DialogTitle>
+        <DialogContent>
+          {freeUser && (
+            <Box sx={{ mb: 2, mt: 1 }}>
+              <Typography variant='body2' color='text.secondary'>
+                User: <strong>{freeUser.name}</strong> ({freeUser.email})
+              </Typography>
+            </Box>
+          )}
+          <Alert severity={freeUser?.isFree ? 'warning' : 'info'} sx={{ mb: freeUser?.isFree ? 0 : 2 }}>
+            {freeUser?.isFree
+              ? 'This user will be charged normally for future orders. Past orders are unaffected.'
+              : 'While free, all of this user’s new orders are automatically zeroed and approved — they won’t be charged.'}
+          </Alert>
+          {!freeUser?.isFree && (
+            <CustomTextField
+              fullWidth label='Reason (optional)' placeholder='e.g. partner / giveaway / staff account'
+              value={freeReason}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFreeReason(e.target.value)}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFreeOpen(false)} color='inherit' disabled={freeSaving}>Cancel</Button>
+          <Button onClick={handleToggleFree} variant='contained'
+            color={freeUser?.isFree ? 'warning' : 'success'} disabled={freeSaving}>
+            {freeSaving ? 'Saving...' : freeUser?.isFree ? 'Remove Free' : 'Make Free'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk make-free Dialog (SUPER_ADMIN only) */}
+      <Dialog open={bulkOpen} onClose={() => !bulkSaving && setBulkOpen(false)} maxWidth='xs' fullWidth>
+        <DialogTitle>{bulkGrant ? 'Make Users Free' : 'Remove Free Status'}</DialogTitle>
+        <DialogContent>
+          <Alert severity={bulkGrant ? 'info' : 'warning'} sx={{ mb: bulkGrant ? 2 : 0, mt: 1 }}>
+            {bulkMode === 'all-customers'
+              ? (bulkGrant
+                  ? 'This makes EVERY customer billing-exempt — none of them will be charged for any product. This can affect many accounts.'
+                  : 'This removes free status from all customers.')
+              : (bulkGrant
+                  ? `${selectedIds.size} selected user(s) will be made billing-exempt (no charge on any product). Staff accounts are skipped.`
+                  : `${selectedIds.size} selected user(s) will be charged normally again.`)}
+          </Alert>
+          {bulkGrant && (
+            <CustomTextField fullWidth label='Reason (optional)' placeholder='e.g. promo / migration / partners'
+              value={bulkReason} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBulkReason(e.target.value)} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkOpen(false)} color='inherit' disabled={bulkSaving}>Cancel</Button>
+          <Button onClick={handleBulkFree} variant='contained' color={bulkGrant ? 'success' : 'warning'} disabled={bulkSaving}>
+            {bulkSaving ? 'Applying...' : bulkMode === 'all-customers' ? (bulkGrant ? 'Free all customers' : 'Remove from all') : (bulkGrant ? 'Make free' : 'Remove free')}
           </Button>
         </DialogActions>
       </Dialog>

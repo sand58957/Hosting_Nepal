@@ -111,11 +111,15 @@ export class RegisterDomainDto {
   })
   nameservers?: string[];
 
-  @ApiProperty({ type: RegistrantContactDto })
+  @ApiPropertyOptional({
+    type: RegistrantContactDto,
+    description:
+      'Registrant contact. Optional — when omitted, a default registrant is derived from the requesting user / env-configured default.',
+  })
+  @IsOptional()
   @ValidateNested()
   @Type(() => RegistrantContactDto)
-  @IsNotEmpty({ message: 'Registrant contact information is required' })
-  registrantContact!: RegistrantContactDto;
+  registrantContact?: RegistrantContactDto;
 
   @ApiPropertyOptional({ default: false })
   @IsOptional()

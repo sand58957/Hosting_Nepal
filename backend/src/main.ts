@@ -1,3 +1,4 @@
+import './instrument'; // Sentry/GlitchTip — must load before everything else.
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';

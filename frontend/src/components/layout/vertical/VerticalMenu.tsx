@@ -1,3 +1,6 @@
+// React Imports
+import { useEffect, useState } from 'react'
+
 // MUI Imports
 import { useTheme } from '@mui/material/styles'
 
@@ -18,6 +21,9 @@ import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNav
 
 // Data Imports
 import verticalMenuData from '@/data/navigation/verticalMenuData'
+
+// Store Imports
+import { useAuthStore } from '@/store/auth.store'
 
 // Component Imports
 import { GenerateVerticalMenu } from '@components/GenerateMenu'
@@ -45,6 +51,13 @@ const VerticalMenu = ({ scrollMenu }: Props) => {
   // Hooks
   const theme = useTheme()
   const verticalNavOptions = useVerticalNav()
+  const role = useAuthStore(s => s.user?.role)
+
+  // Gate role-specific items behind mount so SSR and first client render match
+  // (auth state is hydrated from localStorage only on the client).
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   // Vars
   const { isBreakpointReached, transitionDuration } = verticalNavOptions
@@ -74,7 +87,7 @@ const VerticalMenu = ({ scrollMenu }: Props) => {
         renderExpandedMenuItemIcon={{ icon: <i className='tabler-circle text-xs' /> }}
         menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
       >
-        <GenerateVerticalMenu menuData={verticalMenuData()} />
+        <GenerateVerticalMenu menuData={verticalMenuData(mounted ? role : undefined)} />
       </Menu>
       {/* <Menu
         popoutMenuOffset={{ mainAxis: 23 }}

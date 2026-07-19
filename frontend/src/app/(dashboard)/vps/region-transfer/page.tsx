@@ -47,6 +47,8 @@ const VPSRegionTransferPage = () => {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null)
   const [loading, setLoading] = useState(true)
   const [transferring, setTransferring] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -55,10 +57,11 @@ const VPSRegionTransferPage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch servers:', err)
         setServers([])
       } finally {
         setLoading(false)
@@ -73,11 +76,14 @@ const VPSRegionTransferPage = () => {
   const handleTransfer = async () => {
     if (!selectedServer || !selectedRegion) return
     setTransferring(true)
+    setError('')
+    setSuccess('')
     try {
-      await api.post(`/hosting/vps/${selectedServer}/region-transfer`, { regionId: selectedRegion.id })
+      await api.post(`/hosting/vps/${selectedServer}/region`, { targetRegion: selectedRegion.id })
       setSelectedRegion(null)
-    } catch {
-      // silently handle
+      setSuccess('Region transfer requested — our team will process it shortly.')
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to request region transfer. Please try again.')
     } finally {
       setTransferring(false)
     }
@@ -93,6 +99,18 @@ const VPSRegionTransferPage = () => {
           </Typography>
         </Box>
       </Grid>
+
+      {error && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
+        </Grid>
+      )}
+
+      {success && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='success' onClose={() => setSuccess('')}>{success}</Alert>
+        </Grid>
+      )}
 
       <Grid size={{ xs: 12 }}>
         <Card>

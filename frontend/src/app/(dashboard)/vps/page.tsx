@@ -12,6 +12,7 @@ import Chip from '@mui/material/Chip'
 import Box from '@mui/material/Box'
 import Skeleton from '@mui/material/Skeleton'
 import Divider from '@mui/material/Divider'
+import Alert from '@mui/material/Alert'
 
 import api from '@/lib/api'
 
@@ -43,6 +44,7 @@ const VPSListPage = () => {
   const [servers, setServers] = useState<VPSServer[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   const fetchServers = async () => {
     try {
@@ -50,7 +52,7 @@ const VPSListPage = () => {
       const raw = res.data?.data?.data ?? res.data?.data ?? res.data
       const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
       const vpsList = (Array.isArray(list) ? list : []).filter(
-        (h: any) => h.type === 'VPS' || h.type === 'vps'
+        (h: any) => h.planType === 'VPS'
       )
       setServers(vpsList)
     } catch {
@@ -66,11 +68,12 @@ const VPSListPage = () => {
 
   const handlePowerAction = async (serverId: string, action: 'start' | 'stop' | 'restart') => {
     setActionLoading(`${serverId}-${action}`)
+    setError('')
     try {
       await api.post(`/hosting/vps/${serverId}/${action}`)
       await fetchServers()
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || `Failed to ${action} server. Please try again.`)
     } finally {
       setActionLoading(null)
     }
@@ -95,6 +98,12 @@ const VPSListPage = () => {
           </Button>
         </Box>
       </Grid>
+
+      {error && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
+        </Grid>
+      )}
 
       {loading ? (
         <>

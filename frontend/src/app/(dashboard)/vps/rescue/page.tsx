@@ -34,6 +34,7 @@ const VPSRescuePage = () => {
   const [toggling, setToggling] = useState(false)
   const [rescueActive, setRescueActive] = useState(false)
   const [rescuePassword, setRescuePassword] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -42,10 +43,11 @@ const VPSRescuePage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch servers:', err)
         setServers([])
       } finally {
         setLoading(false)
@@ -56,6 +58,7 @@ const VPSRescuePage = () => {
 
   const handleServerChange = (serverId: string) => {
     setSelectedServer(serverId)
+    setError('')
     const server = servers.find((s) => s.id === serverId)
     setRescueActive(server?.rescueMode || false)
     setRescuePassword(server?.rescuePassword || '')
@@ -66,15 +69,16 @@ const VPSRescuePage = () => {
   const handleToggleRescue = async () => {
     if (!selectedServer) return
     setToggling(true)
+    setError('')
     try {
-      const res = await api.post(`/hosting/vps/${selectedServer}/rescue`, { enable: !rescueActive })
+      const res = await api.post(`/hosting/vps/${selectedServer}/rescue`, { enabled: !rescueActive })
       const raw = res.data?.data?.data ?? res.data?.data ?? res.data
       setRescueActive(!rescueActive)
       if (!rescueActive && raw?.password) {
         setRescuePassword(raw.password)
       }
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to toggle rescue mode. Please try again.')
     } finally {
       setToggling(false)
     }
@@ -90,6 +94,12 @@ const VPSRescuePage = () => {
           </Typography>
         </Box>
       </Grid>
+
+      {error && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
+        </Grid>
+      )}
 
       <Grid size={{ xs: 12 }}>
         <Card>

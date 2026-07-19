@@ -43,6 +43,9 @@ const statusColorMap: Record<string, 'success' | 'warning' | 'error' | 'default'
   ACTIVE: 'success',
   EXPIRING: 'warning',
   EXPIRED: 'error',
+  PENDING_APPROVAL: 'warning',
+  PENDING_REGISTRATION: 'warning',
+  REJECTED: 'error',
 }
 
 const DomainDashboardPage = () => {
@@ -66,10 +69,12 @@ const DomainDashboardPage = () => {
         setData({
           totalDomains: raw?.totalDomains ?? 0,
           activeDomains: raw?.activeDomains ?? 0,
-          expiringSoon: raw?.expiringSoon ?? 0,
+          // Backend returns `expiringDomains` (not expiringSoon) and `domainsByTld`
+          // (an object map, not a `totalTlds` count) — map them correctly.
+          expiringSoon: raw?.expiringDomains ?? raw?.expiringSoon ?? 0,
           expiredDomains: raw?.expiredDomains ?? 0,
           recentlyRegistered: raw?.recentlyRegistered ?? 0,
-          totalTlds: raw?.totalTlds ?? 0,
+          totalTlds: raw?.domainsByTld ? Object.keys(raw.domainsByTld).length : (raw?.totalTlds ?? 0),
           upcomingRenewals: Array.isArray(raw?.upcomingRenewals) ? raw.upcomingRenewals : [],
         })
       } catch {

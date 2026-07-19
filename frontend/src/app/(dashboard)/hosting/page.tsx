@@ -74,6 +74,7 @@ const HostingPage = () => {
   const [selectedSite, setSelectedSite] = useState<Website | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   const fetchWebsites = async () => {
     try {
@@ -137,8 +138,8 @@ const HostingPage = () => {
     try {
       await api.delete(`/hosting/websites/${selectedSite.id}`)
       setWebsites((prev) => prev.filter((w) => w.id !== selectedSite.id))
-    } catch {
-      // handle error
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || 'Action failed.')
     } finally {
       setDeleting(false)
       setDeleteDialogOpen(false)
@@ -152,8 +153,8 @@ const HostingPage = () => {
     try {
       await api.post(`/hosting/${selectedSite.id}/suspend`)
       fetchWebsites()
-    } catch {
-      // handle error
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || 'Action failed.')
     }
   }
 
@@ -175,6 +176,11 @@ const HostingPage = () => {
             }
           />
           <CardContent>
+            {actionError && (
+              <Alert severity='error' sx={{ mb: 4 }} onClose={() => setActionError('')}>
+                {actionError}
+              </Alert>
+            )}
             {/* Filter */}
             <Box sx={{ mb: 4, display: 'flex', gap: 2, alignItems: 'center' }}>
               <FormControl size='small' sx={{ minWidth: 160 }}>

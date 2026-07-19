@@ -21,10 +21,13 @@ import {
   PromoStatus,
   DiscountType,
 } from '@prisma/client';
+import { SendgridService } from '../email/services/sendgrid.service';
 import { AdminQueryDto } from './dto/admin-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { CreatePromoCodeDto } from './dto/create-promo-code.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserFreeDto } from './dto/update-user-free.dto';
+import { BulkUserFreeDto, BulkFreeScope } from './dto/bulk-user-free.dto';
 
 export interface RevenueDataPoint {
   period: string;
@@ -54,7 +57,71 @@ export interface DashboardStats {
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: SendgridService,
+  ) {}
+
+  /** SUPER_ADMIN: send one sample of each transactional email template to `to`. */
+  async sendEmailSamples(to: string) {
+    const user = { email: to, firstName: 'Sandeep' };
+    const results = {
+      vpsProvisioned: await this.mail.sendVpsProvisioned(user, {
+        displayName: 'Digital Nepal',
+        planName: 'VPS 10',
+        ipAddress: '13.140.162.144',
+        ipv6: '2a02:c207:2336:1939::1',
+        location: 'Hub Europe (EU)',
+        username: 'admin',
+        sshKeyInstalled: true,
+      }),
+      paymentReminder: await this.mail.sendPaymentReminder(user, {
+        totalDueNpr: 1066,
+        daysLeft: 5,
+        services: [{ name: 'VPS 10 — Digital Nepal', paidUntil: '2026-07-09', amountNpr: 1066 }],
+      }),
+      suspensionWarning: await this.mail.sendSuspensionWarning(user, {
+        totalDueNpr: 1066,
+        graceDays: 4,
+        reactivationFeeNpr: 1000,
+        services: [{ name: 'VPS 10 — Digital Nepal', paidUntil: '2026-06-06', amountNpr: 1066 }],
+      }),
+      cancellation: await this.mail.sendServiceCancelled(user, {
+        serviceName: 'VPS 10 — Digital Nepal',
+        planName: 'VPS 10',
+        endsOn: '2026-07-09',
+        reason: 'Cancelled at customer request',
+      }),
+      loginAlert: await this.mail.sendLoginAlert(user, {
+        ip: '203.0.113.42',
+        method: 'Email & password',
+      }),
+      vpsRequestReceived: await this.mail.sendVpsRequestReceived(user, {
+        planName: 'VPS 10',
+        hostname: 'Digital Nepal',
+      }),
+      upgradeApplied: await this.mail.sendVpsUpgradeApplied(user, {
+        serviceName: 'Digital Nepal',
+        newPlan: 'VPS 20',
+        ipAddress: '13.140.162.144',
+      }),
+      securityChange: await this.mail.sendSecurityChangeNotice(user, {
+        change: 'Password changed',
+        detail: 'All active sessions were signed out.',
+      }),
+      adminVpsAlert: await this.mail.sendAdminVpsRequestAlert({
+        customerName: 'Aditya Raj Group',
+        customerEmail: 'adityarajgroup.ai@gmail.com',
+        planName: 'VPS 10',
+        hostname: 'Digital Nepal',
+        isFree: true,
+      }),
+    };
+    this.logger.log(`Email template samples sent to ${to}`);
+    return Object.fromEntries(
+      Object.entries(results).map(([k, v]) => [k, v.success ? `sent (${v.messageId ?? 'ok'})` : 'FAILED']),
+    );
+  }
 
   // ─── Dashboard Stats ────────────────────────────────────────────────────────
 
@@ -200,6 +267,7 @@ export class AdminService {
           companyName: true,
           role: true,
           status: true,
+          isFree: true,
           emailVerified: true,
           lastLoginAt: true,
           createdAt: true,
@@ -232,6 +300,9 @@ export class AdminService {
         companyName: true,
         role: true,
         status: true,
+        isFree: true,
+        freeSince: true,
+        freeReason: true,
         emailVerified: true,
         phoneVerified: true,
         twoFactorEnabled: true,
@@ -381,6 +452,103 @@ export class AdminService {
 
     this.logger.log(`User ${id} role updated to ${role}`);
     return updated;
+  }
+
+  async setUserFree(id: string, dto: UpdateUserFreeDto, actingAdminId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, role: true, isFree: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id "${id}" not found`);
+    }
+
+    if (
+      dto.isFree &&
+      (user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN)
+    ) {
+      throw new BadRequestException(
+        'Staff accounts (ADMIN / SUPER_ADMIN) cannot be marked billing-exempt.',
+      );
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: dto.isFree
+        ? {
+            isFree: true,
+            freeSince: new Date(),
+            freeReason: dto.reason ?? null,
+            freeGrantedBy: actingAdminId,
+          }
+        : {
+            isFree: false,
+            freeSince: null,
+            freeReason: null,
+            freeGrantedBy: null,
+          },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isFree: true,
+        freeSince: true,
+        freeReason: true,
+        updatedAt: true,
+      },
+    });
+
+    this.logger.log(
+      `User ${id} isFree set to ${dto.isFree} by admin ${actingAdminId}` +
+        `${dto.reason ? ` — reason: ${dto.reason}` : ''}`,
+    );
+    return updated;
+  }
+
+  async setUsersFreeBulk(dto: BulkUserFreeDto, actingAdminId: string) {
+    const staff = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+
+    // Staff (ADMIN/SUPER_ADMIN) can never be billing-exempt — always excluded.
+    const where: Record<string, unknown> = { role: { notIn: staff } };
+
+    if (dto.userIds && dto.userIds.length > 0) {
+      where.id = { in: dto.userIds };
+    } else if (dto.scope === BulkFreeScope.ALL_CUSTOMERS) {
+      where.role = UserRole.CUSTOMER;
+    } else if (dto.scope === BulkFreeScope.ALL_NON_STAFF) {
+      // role notIn staff already covers CUSTOMER/RESELLER/SUPPORT_AGENT
+    } else {
+      throw new BadRequestException(
+        'Provide userIds[] or a scope (ALL_CUSTOMERS | ALL_NON_STAFF).',
+      );
+    }
+
+    const data = dto.isFree
+      ? {
+          isFree: true,
+          freeSince: new Date(),
+          freeReason: dto.reason ?? null,
+          freeGrantedBy: actingAdminId,
+        }
+      : { isFree: false, freeSince: null, freeReason: null, freeGrantedBy: null };
+
+    const result = await this.prisma.user.updateMany({ where, data });
+
+    const requested = dto.userIds?.length ?? null;
+    this.logger.log(
+      `Bulk isFree=${dto.isFree}: updated ${result.count} user(s) by admin ${actingAdminId} ` +
+        `(${requested !== null ? `requested ${requested}` : `scope ${dto.scope}`})`,
+    );
+
+    return {
+      isFree: dto.isFree,
+      updated: result.count,
+      requested,
+      skipped: requested !== null ? Math.max(requested - result.count, 0) : 0,
+      // Only report scope for the scope-based branch; the userIds path applied no scope.
+      scope: requested !== null ? null : dto.scope ?? null,
+    };
   }
 
   async getUserAnalytics() {

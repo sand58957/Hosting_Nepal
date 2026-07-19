@@ -21,6 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { HostingService } from './hosting.service';
 import { CreateHostingDto } from './dto/create-hosting.dto';
 import { CreateVpsDto } from './dto/create-vps.dto';
@@ -65,6 +67,19 @@ export class HostingController {
     return this.hostingService.getPlansWithLivePricing();
   }
 
+  // Used by the authenticated order/reinstall UI — gate it like the other
+  // hosting endpoints (it was previously exposed without a guard).
+  @Get('vps-images')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({
+    summary: 'List ALL available VPS OS images (live from Contabo, cached 1h)',
+  })
+  @ApiResponse({ status: 200, description: 'Array of { imageId, name, osType, version }' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getVpsImages() {
+    return this.hostingService.getVpsImages();
+  }
+
   // ── Shared / WordPress Hosting ──────────────────────────────────────────────
 
   @Post()
@@ -84,6 +99,15 @@ export class HostingController {
   @ApiResponse({ status: 200, description: 'List of hosting accounts' })
   getMyHosting(@Req() req: AuthRequest) {
     return this.hostingService.getMyHosting(req.user.id);
+  }
+
+  // NOTE: must stay above @Get(':id') or that route captures the path.
+  @Get('vps-activity')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Recent VPS actions for the authenticated user (from the activity log)' })
+  @ApiResponse({ status: 200, description: 'List of recent VPS actions, newest first' })
+  getVpsActivity(@Req() req: AuthRequest) {
+    return this.hostingService.getRecentVpsActivity(req.user.id);
   }
 
   @Get(':id')
@@ -428,6 +452,68 @@ export class HostingController {
   @ApiResponse({ status: 400, description: 'Invalid plan' })
   createVps(@Body() dto: CreateVpsDto, @Req() req: AuthRequest) {
     return this.hostingService.createVps(req.user.id, dto);
+  }
+
+  // ── VPS approvals (SUPER_ADMIN) ──────────────────────────────────────────────
+
+  @Get('admin/vps-approvals')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'List VPS requests awaiting approval (SUPER_ADMIN)' })
+  getPendingVpsApprovals() {
+    return this.hostingService.getPendingVpsApprovals();
+  }
+
+  @Post('admin/expiry-reminder-run')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Manually run the 7-day pre-expiry renewal-reminder sweep (SUPER_ADMIN)',
+  })
+  runExpiryReminderSweep() {
+    return this.hostingService.runExpiryReminderSweep();
+  }
+
+  @Post('vps/:id/approve')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve a pending VPS request → provisioning starts (SUPER_ADMIN)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  approveVps(@Param('id', ParseUUIDPipe) id: string) {
+    return this.hostingService.approveVps(id);
+  }
+
+  @Post('vps/:id/reject')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject a pending VPS request (SUPER_ADMIN)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  rejectVps(@Param('id', ParseUUIDPipe) id: string, @Body() body: { reason?: string }) {
+    return this.hostingService.rejectVps(id, body?.reason);
+  }
+
+  @Get('admin/vps-upgrade-requests')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'List pending VPS plan-upgrade requests (SUPER_ADMIN)' })
+  getPendingVpsUpgrades() {
+    return this.hostingService.getPendingVpsUpgrades();
+  }
+
+  @Post('vps/:id/sync-from-provider')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Sync a Contabo VPS record from the live instance (plan/IP/status) — run after applying an upgrade in the Contabo panel (SUPER_ADMIN)',
+  })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  syncVpsFromContabo(@Param('id', ParseUUIDPipe) id: string) {
+    return this.hostingService.syncVpsFromContabo(id);
   }
 
   @Get('vps/:id')

@@ -51,6 +51,8 @@ const VPSSnapshotsPage = () => {
   const [loading, setLoading] = useState(true)
   const [snapshotsLoading, setSnapshotsLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   // Dialog
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -65,10 +67,11 @@ const VPSSnapshotsPage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch servers:', err)
         setServers([])
       } finally {
         setLoading(false)
@@ -99,6 +102,8 @@ const VPSSnapshotsPage = () => {
 
   const handleCreate = async () => {
     if (!snapshotName.trim() || !selectedServer) return
+    setError('')
+    setSuccess('')
     setCreating(true)
     try {
       await api.post(`/hosting/vps/${selectedServer}/snapshots`, {
@@ -108,32 +113,39 @@ const VPSSnapshotsPage = () => {
       setDialogOpen(false)
       setSnapshotName('')
       setSnapshotDesc('')
+      setSuccess('Snapshot created.')
       await fetchSnapshots(selectedServer)
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Create failed.')
     } finally {
       setCreating(false)
     }
   }
 
   const handleRestore = async (snapshotId: string) => {
+    setError('')
+    setSuccess('')
     setActionLoading(`restore-${snapshotId}`)
     try {
       await api.post(`/hosting/vps/${selectedServer}/snapshots/${snapshotId}/restore`)
-    } catch {
-      // silently handle
+      setSuccess('Restore started.')
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Restore failed.')
     } finally {
       setActionLoading(null)
     }
   }
 
   const handleDelete = async (snapshotId: string) => {
+    setError('')
+    setSuccess('')
     setActionLoading(`delete-${snapshotId}`)
     try {
       await api.delete(`/hosting/vps/${selectedServer}/snapshots/${snapshotId}`)
+      setSuccess('Snapshot deleted.')
       await fetchSnapshots(selectedServer)
-    } catch {
-      // silently handle
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Delete failed.')
     } finally {
       setActionLoading(null)
     }
@@ -163,6 +175,8 @@ const VPSSnapshotsPage = () => {
             </Button>
           )}
         </Box>
+        {error && <Alert severity='error' sx={{ mb: 2 }}>{error}</Alert>}
+        {success && <Alert severity='success' sx={{ mb: 2 }}>{success}</Alert>}
       </Grid>
 
       <Grid size={{ xs: 12 }}>

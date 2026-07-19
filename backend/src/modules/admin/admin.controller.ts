@@ -12,6 +12,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,14 +24,18 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminService } from './admin.service';
+import { GlitchTipService } from './services/glitchtip.service';
 import { AdminQueryDto } from './dto/admin-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreatePromoCodeDto } from './dto/create-promo-code.dto';
 import { BroadcastNotificationDto } from './dto/broadcast-notification.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserFreeDto } from './dto/update-user-free.dto';
+import { BulkUserFreeDto } from './dto/bulk-user-free.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -40,7 +45,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
 
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly glitchTip: GlitchTipService,
+  ) {}
 
   // ─── Dashboard ──────────────────────────────────────────────────────────────
 
@@ -114,6 +122,61 @@ export class AdminController {
   ) {
     this.logger.log(`Admin updating user ${id} role to ${body.role}`);
     return this.adminService.updateUserRole(id, body.role);
+  }
+
+  @Patch('users/:id/free')
+  @HttpCode(HttpStatus.OK)
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({
+    summary: 'Grant or revoke billing-exempt (free) status for a user — SUPER_ADMIN only',
+  })
+  @ApiParam({ name: 'id', description: 'User UUID' })
+  @ApiResponse({ status: 200, description: 'User free status updated' })
+  @ApiResponse({ status: 403, description: 'Forbidden — requires SUPER_ADMIN' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async setUserFree(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserFreeDto,
+    @CurrentUser() actor: any,
+  ) {
+    // request.user is the DB user from JwtStrategy.validate (has `id`); fall back
+    // to `sub` for safety, matching the pattern used elsewhere (e.g. blog controllers).
+    const actingAdminId = actor?.id || actor?.sub;
+    this.logger.log(
+      `SUPER_ADMIN ${actingAdminId} setting user ${id} isFree=${dto.isFree}`,
+    );
+    return this.adminService.setUserFree(id, dto, actingAdminId);
+  }
+
+  @Post('email-samples')
+  @HttpCode(HttpStatus.OK)
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({
+    summary: 'Send one sample of each transactional email template to an address — SUPER_ADMIN only',
+  })
+  async sendEmailSamples(@Body() body: { to: string }) {
+    if (!body?.to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.to)) {
+      throw new BadRequestException('Valid "to" email required');
+    }
+    this.logger.log(`Sending email template samples to ${body.to}`);
+    return this.adminService.sendEmailSamples(body.to);
+  }
+
+  @Post('users/bulk-free')
+  @HttpCode(HttpStatus.OK)
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({
+    summary:
+      'Bulk grant/revoke billing-exempt (free) status for many users at once — SUPER_ADMIN only',
+  })
+  @ApiResponse({ status: 200, description: 'Bulk update applied; returns updated count' })
+  @ApiResponse({ status: 403, description: 'Forbidden — requires SUPER_ADMIN' })
+  async setUsersFreeBulk(@Body() dto: BulkUserFreeDto, @CurrentUser() actor: any) {
+    const actingAdminId = actor?.id || actor?.sub;
+    this.logger.log(
+      `SUPER_ADMIN ${actingAdminId} bulk isFree=${dto.isFree} (scope=${dto.scope || 'ids'}, ids=${dto.userIds?.length ?? 0})`,
+    );
+    return this.adminService.setUsersFreeBulk(dto, actingAdminId);
   }
 
   @Get('users-analytics')
@@ -298,5 +361,31 @@ export class AdminController {
   async updateSiteConfig(@Body() config: Record<string, any>) {
     this.logger.log('Admin updating site config');
     return this.adminService.updateSiteConfig(config);
+  }
+
+  // ─── Error Tracking (GlitchTip) — SUPER_ADMIN only ───────────────────────────
+
+  @Get('error-tracking/overview')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({
+    summary:
+      'Error-tracking overview from self-hosted GlitchTip (projects + unresolved issues) — SUPER_ADMIN only',
+  })
+  @ApiResponse({ status: 200, description: 'Overview, or { configured:false } if GlitchTip env is unset' })
+  @ApiResponse({ status: 403, description: 'Forbidden — requires SUPER_ADMIN' })
+  getErrorTrackingOverview() {
+    return this.glitchTip.getOverview();
+  }
+
+  @Get('error-tracking/issues')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'List GlitchTip issues (filterable) — SUPER_ADMIN only' })
+  @ApiQuery({ name: 'query', required: false, description: "GlitchTip search, e.g. 'is:unresolved'" })
+  @ApiQuery({ name: 'limit', required: false, description: 'Max issues (1–100, default 25)' })
+  getErrorTrackingIssues(
+    @Query('query') query?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.glitchTip.getIssues(query || 'is:unresolved', limit ? Number(limit) : 25);
   }
 }

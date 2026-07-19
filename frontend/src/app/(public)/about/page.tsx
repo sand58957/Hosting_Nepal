@@ -88,11 +88,25 @@ const AboutPage = () => {
                   Headquartered at <strong style={{ color: '#fff' }}>Koteshwor-32, Kathmandu</strong>, Hosting Nepal was founded with a singular vision: to make enterprise-grade web hosting accessible and affordable for every business in Nepal.
                 </Typography>
                 <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.9, mb: 2 }}>
-                  We are owned and operated by <strong style={{ color: '#fff' }}>Marketminds Investment Group</strong>, a forward-thinking technology investment firm committed to building Nepal&apos;s digital infrastructure. Our platform is engineered and developed by <strong style={{ color: '#fff' }}>Himalayan Tech Solutions, Kathmandu</strong>, a team of experienced Nepali software engineers and DevOps professionals.
+                  Hosting Nepal is a <strong style={{ color: '#fff' }}>subsidiary of Marketminds Investment Group Pvt. Ltd.</strong>, a forward-thinking technology investment firm committed to building Nepal&apos;s digital infrastructure. Our platform is engineered and developed by <strong style={{ color: '#fff' }}>Himalayan Tech Solutions, Kathmandu</strong>, a team of experienced Nepali software engineers and DevOps professionals.
                 </Typography>
-                <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.9 }}>
+                <Typography variant='body1' sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.9, mb: 3 }}>
                   From domain registration and WordPress hosting to VPS, VDS, and dedicated servers, we offer a complete ecosystem of web services — all with pricing in Nepali Rupees (NPR) and integration with local payment platforms like Khalti, eSewa, and Nepal bank transfers.
                 </Typography>
+                <Box sx={{ bgcolor: 'rgba(115,103,240,0.06)', border: '1px solid rgba(115,103,240,0.15)', borderRadius: 2, p: 2.5 }}>
+                  <Typography variant='overline' sx={{ color: '#A89CF5', letterSpacing: 1.5, fontWeight: 700, display: 'block', mb: 1.5 }}>Company Registration</Typography>
+                  {[
+                    { label: 'Parent Company', value: 'Marketminds Investment Group Pvt. Ltd.' },
+                    { label: 'Registered With', value: 'Govt. of Nepal — Office of the Company Registrar' },
+                    { label: 'Company Reg. No.', value: '350091/81/82' },
+                    { label: 'Incorporated', value: '25 July 2024 (Companies Act, 2006)' },
+                  ].map(row => (
+                    <Box key={row.label} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.5, flexWrap: 'wrap' }}>
+                      <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.45)' }}>{row.label}</Typography>
+                      <Typography variant='body2' sx={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>{row.value}</Typography>
+                    </Box>
+                  ))}
+                </Box>
               </CardContent>
             </Card>
           </Grid>
@@ -263,7 +277,7 @@ const AboutPage = () => {
       {/* Footer */}
       <Box sx={{ bgcolor: '#131325', py: 4, textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.3)' }}>
-          {new Date().getFullYear()} &copy; Marketminds Investment Group. All rights reserved.
+          {new Date().getFullYear()} &copy; Hosting Nepal — a subsidiary of Marketminds Investment Group Pvt. Ltd. All rights reserved.
         </Typography>
       </Box>
     </Box>

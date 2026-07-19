@@ -14,6 +14,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Skeleton from '@mui/material/Skeleton'
 import Divider from '@mui/material/Divider'
 import Avatar from '@mui/material/Avatar'
+import Alert from '@mui/material/Alert'
 
 import CustomTextField from '@core/components/mui/TextField'
 import api from '@/lib/api'
@@ -23,25 +24,32 @@ interface VPSServer {
   hostname: string
   ipAddress: string
   planName: string
-  activeAddons?: string[]
 }
 
 interface Addon {
   id: string
+  // Backend AddAddonDto enum value (POST { addonType }, GET returns { type })
+  addonType: string
   name: string
   description: string
   price: number
   icon: string
 }
 
+// Add-on records as stored/returned by the backend (id is backend-generated).
+interface ActiveAddon {
+  id: string
+  type: string
+}
+
 const availableAddons: Addon[] = [
-  { id: 'extra-ipv4', name: 'Extra IPv4 Address', description: 'Additional dedicated IPv4 address for your server', price: 299, icon: 'tabler-network' },
-  { id: 'ddos-protection', name: 'DDoS Protection', description: 'Enterprise-grade DDoS mitigation up to 1Tbps', price: 499, icon: 'tabler-shield-check' },
-  { id: 'auto-backups', name: 'Automatic Backups', description: 'Daily automated backups with 7-day retention', price: 399, icon: 'tabler-cloud-upload' },
-  { id: 'monitoring', name: 'Monitoring & Alerts', description: 'Real-time monitoring with email and SMS alerts', price: 199, icon: 'tabler-activity' },
-  { id: 'windows-license', name: 'Windows License', description: 'Windows Server license for your VPS', price: 1499, icon: 'tabler-brand-windows' },
-  { id: 'cpanel', name: 'cPanel/WHM', description: 'cPanel/WHM control panel for web hosting management', price: 2499, icon: 'tabler-layout-dashboard' },
-  { id: 'plesk', name: 'Plesk', description: 'Plesk control panel with WordPress toolkit', price: 999, icon: 'tabler-server' },
+  { id: 'extra-ipv4', addonType: 'ipv4', name: 'Extra IPv4 Address', description: 'Additional dedicated IPv4 address for your server', price: 299, icon: 'tabler-network' },
+  { id: 'ddos-protection', addonType: 'ddos', name: 'DDoS Protection', description: 'Enterprise-grade DDoS mitigation up to 1Tbps', price: 499, icon: 'tabler-shield-check' },
+  { id: 'auto-backups', addonType: 'backup', name: 'Automatic Backups', description: 'Daily automated backups with 7-day retention', price: 399, icon: 'tabler-cloud-upload' },
+  { id: 'monitoring', addonType: 'monitoring', name: 'Monitoring & Alerts', description: 'Real-time monitoring with email and SMS alerts', price: 199, icon: 'tabler-activity' },
+  { id: 'windows-license', addonType: 'windows', name: 'Windows License', description: 'Windows Server license for your VPS', price: 1499, icon: 'tabler-brand-windows' },
+  { id: 'cpanel', addonType: 'cpanel', name: 'cPanel/WHM', description: 'cPanel/WHM control panel for web hosting management', price: 2499, icon: 'tabler-layout-dashboard' },
+  { id: 'plesk', addonType: 'plesk', name: 'Plesk', description: 'Plesk control panel with WordPress toolkit', price: 999, icon: 'tabler-server' },
 ]
 
 const VPSAddonsPage = () => {
@@ -49,7 +57,9 @@ const VPSAddonsPage = () => {
   const [selectedServer, setSelectedServer] = useState('')
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [activeAddons, setActiveAddons] = useState<string[]>([])
+  const [activeAddons, setActiveAddons] = useState<ActiveAddon[]>([])
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -58,10 +68,11 @@ const VPSAddonsPage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS'
         )
         setServers(vpsList)
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch servers:', err)
         setServers([])
       } finally {
         setLoading(false)
@@ -70,39 +81,82 @@ const VPSAddonsPage = () => {
     fetchServers()
   }, [])
 
+  // Load the active add-ons for the selected server from the backend. Add-ons
+  // are stored with backend-generated ids, so the source of truth is this GET.
+  useEffect(() => {
+    if (!selectedServer) {
+      setActiveAddons([])
+      return
+    }
+    const fetchAddons = async () => {
+      setError('')
+      try {
+        const res = await api.get(`/hosting/vps/${selectedServer}/addons`)
+        const data = res.data?.data?.data ?? res.data?.data ?? res.data
+        const list = Array.isArray(data) ? data : data?.addons ?? []
+        setActiveAddons(
+          (Array.isArray(list) ? list : []).map((a: any) => ({ id: a.id, type: a.type }))
+        )
+      } catch (err: any) {
+        setActiveAddons([])
+        setError(err?.response?.data?.message || 'Failed to load active add-ons.')
+      }
+    }
+    fetchAddons()
+  }, [selectedServer])
+
   const handleServerChange = (serverId: string) => {
     setSelectedServer(serverId)
-    const server = servers.find((s) => s.id === serverId)
-    setActiveAddons(server?.activeAddons || [])
+    setSuccess('')
+    setError('')
   }
 
-  const handleAddAddon = async (addonId: string) => {
+  const handleAddAddon = async (addon: Addon) => {
     if (!selectedServer) return
-    setActionLoading(addonId)
+    setActionLoading(addon.id)
+    setSuccess('')
+    setError('')
     try {
-      await api.post(`/hosting/vps/${selectedServer}/addons`, { addonId })
-      setActiveAddons((prev) => [...prev, addonId])
-    } catch {
-      // silently handle
+      const res = await api.post(`/hosting/vps/${selectedServer}/addons`, { addonType: addon.addonType })
+      const addonId = res.data?.data?.data?.addonId ?? res.data?.data?.addonId ?? res.data?.addonId
+      if (addonId) {
+        setActiveAddons((prev) => [...prev, { id: addonId, type: addon.addonType }])
+      } else {
+        // POST didn't surface an id at a known path — re-fetch so the new row carries
+        // a real id (otherwise a later Remove would DELETE /addons/undefined).
+        try {
+          const listRes = await api.get(`/hosting/vps/${selectedServer}/addons`)
+          const d = listRes.data?.data?.data ?? listRes.data?.data ?? listRes.data
+          const arr = Array.isArray(d) ? d : d?.addons ?? []
+          setActiveAddons((Array.isArray(arr) ? arr : []).map((a: any) => ({ id: a.id, type: a.type })))
+        } catch { /* leave the list unchanged */ }
+      }
+      setSuccess(`${addon.name} added successfully.`)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || `Failed to add ${addon.name}.`)
     } finally {
       setActionLoading(null)
     }
   }
 
-  const handleRemoveAddon = async (addonId: string) => {
+  const handleRemoveAddon = async (active: ActiveAddon, addon: Addon) => {
     if (!selectedServer) return
-    setActionLoading(addonId)
+    setActionLoading(addon.id)
+    setSuccess('')
+    setError('')
     try {
-      await api.delete(`/hosting/vps/${selectedServer}/addons/${addonId}`)
-      setActiveAddons((prev) => prev.filter((a) => a !== addonId))
-    } catch {
-      // silently handle
+      await api.delete(`/hosting/vps/${selectedServer}/addons/${active.id}`)
+      setActiveAddons((prev) => prev.filter((a) => a.id !== active.id))
+      setSuccess(`${addon.name} removed successfully.`)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || `Failed to remove ${addon.name}.`)
     } finally {
       setActionLoading(null)
     }
   }
 
-  const isActive = (addonId: string) => activeAddons.includes(addonId)
+  // Find the backend record (if any) for a given available add-on by its enum type.
+  const findActive = (addon: Addon) => activeAddons.find((a) => a.type === addon.addonType)
 
   return (
     <Grid container spacing={6}>
@@ -141,12 +195,23 @@ const VPSAddonsPage = () => {
 
       {selectedServer && (
         <>
+          {success && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity='success' onClose={() => setSuccess('')}>{success}</Alert>
+            </Grid>
+          )}
+          {error && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity='error' onClose={() => setError('')}>{error}</Alert>
+            </Grid>
+          )}
+
           {/* Available Add-ons */}
           <Grid size={{ xs: 12 }}>
             <Typography variant='h6' sx={{ mb: 2 }}>Available Add-Ons</Typography>
             <Grid container spacing={3}>
               {availableAddons.map((addon) => {
-                const active = isActive(addon.id)
+                const active = findActive(addon)
                 return (
                   <Grid size={{ xs: 12, sm: 6, md: 4 }} key={addon.id}>
                     <Card variant='outlined' sx={{ height: '100%', position: 'relative' }}>
@@ -174,7 +239,7 @@ const VPSAddonsPage = () => {
                             variant='outlined'
                             color='error'
                             fullWidth
-                            onClick={() => handleRemoveAddon(addon.id)}
+                            onClick={() => handleRemoveAddon(active, addon)}
                             disabled={actionLoading === addon.id}
                             startIcon={actionLoading === addon.id ? <CircularProgress size={16} /> : <i className='tabler-trash' />}
                           >
@@ -184,7 +249,7 @@ const VPSAddonsPage = () => {
                           <Button
                             variant='contained'
                             fullWidth
-                            onClick={() => handleAddAddon(addon.id)}
+                            onClick={() => handleAddAddon(addon)}
                             disabled={actionLoading === addon.id}
                             startIcon={actionLoading === addon.id ? <CircularProgress size={16} /> : <i className='tabler-plus' />}
                           >
@@ -206,11 +271,11 @@ const VPSAddonsPage = () => {
                 <CardContent>
                   <Typography variant='h6' sx={{ mb: 2 }}>Active Add-Ons</Typography>
                   <Divider sx={{ mb: 2 }} />
-                  {activeAddons.map((addonId) => {
-                    const addon = availableAddons.find((a) => a.id === addonId)
+                  {activeAddons.map((active) => {
+                    const addon = availableAddons.find((a) => a.addonType === active.type)
                     if (!addon) return null
                     return (
-                      <Box key={addonId} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
+                      <Box key={active.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <i className={addon.icon} style={{ fontSize: 20 }} />
                           <Typography variant='body1'>{addon.name}</Typography>
@@ -225,8 +290,8 @@ const VPSAddonsPage = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant='h6'>Total Add-Ons Cost</Typography>
                     <Typography variant='h6' color='primary.main'>
-                      NPR {activeAddons.reduce((sum, id) => {
-                        const addon = availableAddons.find((a) => a.id === id)
+                      NPR {activeAddons.reduce((sum, active) => {
+                        const addon = availableAddons.find((a) => a.addonType === active.type)
                         return sum + (addon?.price || 0)
                       }, 0).toLocaleString()}/mo
                     </Typography>

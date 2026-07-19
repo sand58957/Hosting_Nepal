@@ -403,7 +403,7 @@ const AddWebsitePage = () => {
                             </Typography>
                             <Divider sx={{ my: 2 }} />
                             <Box sx={{ textAlign: 'left' }}>
-                              {plan.features.slice(0, 5).map((f, i) => (
+                              {(plan.features ?? []).slice(0, 5).map((f, i) => (
                                 <Typography key={i} variant='body2' sx={{ mb: 0.5 }}>
                                   <i
                                     className='tabler-check'

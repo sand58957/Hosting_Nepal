@@ -49,7 +49,13 @@ services:
       - hn-network
 
   hn-frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # GlitchTip DSN must be baked in at build time (it ships in the client bundle).
+      # Set NEXT_PUBLIC_SENTRY_DSN in the root .env or shell before building; empty = disabled.
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_GLITCHTIP_URL: ${NEXT_PUBLIC_GLITCHTIP_URL:-https://errors.nepalfillings.com}
     container_name: hn-frontend
     restart: always
     environment:

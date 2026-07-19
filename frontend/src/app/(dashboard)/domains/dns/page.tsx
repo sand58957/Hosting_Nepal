@@ -24,6 +24,7 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
+import Alert from '@mui/material/Alert'
 
 import CustomTextField from '@core/components/mui/TextField'
 import api from '@/lib/api'
@@ -31,6 +32,7 @@ import api from '@/lib/api'
 interface Domain {
   id: string
   name: string
+  nameservers?: string[]
 }
 
 interface DnsRecord {
@@ -72,12 +74,23 @@ const DnsManagementPage = () => {
   const [formPriority, setFormPriority] = useState(10)
   const [saving, setSaving] = useState(false)
 
+  // Nameservers (point the domain to another DNS provider, e.g. Cloudflare)
+  const [nsList, setNsList] = useState<string[]>(['', '', '', ''])
+  const [nsSaving, setNsSaving] = useState(false)
+  const [nsMsg, setNsMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   useEffect(() => {
     const fetchDomains = async () => {
       try {
         const res = await api.get('/domains')
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
-        const list = Array.isArray(raw?.domains) ? raw.domains : Array.isArray(raw) ? raw : []
+        const rows = Array.isArray(raw?.domains) ? raw.domains : Array.isArray(raw) ? raw : []
+        // Backend returns Prisma rows (domainName, nameservers Json); normalize.
+        const list: Domain[] = rows.map((d: any) => ({
+          id: d.id,
+          name: d.name ?? d.domainName ?? '',
+          nameservers: Array.isArray(d.nameservers) ? d.nameservers : [],
+        }))
         setDomains(list)
         if (list.length > 0) setSelectedDomain(list[0].id)
       } catch {
@@ -109,6 +122,38 @@ const DnsManagementPage = () => {
 
     fetchRecords()
   }, [selectedDomain])
+
+  // Populate the nameserver fields whenever the selected domain (or list) changes.
+  useEffect(() => {
+    const d = domains.find((x) => x.id === selectedDomain)
+    const ns = d?.nameservers ?? []
+    setNsList([ns[0] || '', ns[1] || '', ns[2] || '', ns[3] || ''])
+    setNsMsg(null)
+  }, [selectedDomain, domains])
+
+  const handleSaveNameservers = async () => {
+    const nameservers = nsList.map((s) => s.trim()).filter(Boolean)
+
+    if (nameservers.length < 2) {
+      setNsMsg({ type: 'error', text: 'At least 2 nameservers are required.' })
+
+      return
+    }
+
+    setNsSaving(true)
+    setNsMsg(null)
+
+    try {
+      await api.put(`/domains/${selectedDomain}/nameservers`, { nameservers })
+      setNsMsg({ type: 'success', text: 'Nameservers updated. DNS propagation can take up to 24 hours.' })
+      setDomains((prev) => prev.map((d) => (d.id === selectedDomain ? { ...d, nameservers } : d)))
+    } catch (e: any) {
+      const m = e?.response?.data?.message
+      setNsMsg({ type: 'error', text: (Array.isArray(m) ? m.join(', ') : m) || 'Failed to update nameservers.' })
+    } finally {
+      setNsSaving(false)
+    }
+  }
 
   const openAddDialog = () => {
     setEditingRecord(null)
@@ -213,10 +258,64 @@ const DnsManagementPage = () => {
         </Card>
       </Grid>
 
+      {/* Nameservers */}
+      {selectedDomain && (
+        <Grid size={{ xs: 12 }}>
+          <Card>
+            <CardHeader
+              title='Nameservers'
+              subheader='Point this domain to another DNS provider (e.g. Cloudflare). Enter at least 2.'
+            />
+            <CardContent>
+              {nsMsg && (
+                <Alert severity={nsMsg.type} onClose={() => setNsMsg(null)} sx={{ mb: 3 }}>
+                  {nsMsg.text}
+                </Alert>
+              )}
+              <Grid container spacing={3}>
+                {[0, 1, 2, 3].map((i) => (
+                  <Grid size={{ xs: 12, sm: 6 }} key={i}>
+                    <CustomTextField
+                      fullWidth
+                      label={i < 2 ? `Nameserver ${i + 1} *` : `Nameserver ${i + 1} (optional)`}
+                      placeholder={
+                        i === 0 ? 'e.g. dana.ns.cloudflare.com' : i === 1 ? 'e.g. rob.ns.cloudflare.com' : ''
+                      }
+                      value={nsList[i]}
+                      onChange={(e) =>
+                        setNsList((prev) => prev.map((v, idx) => (idx === i ? e.target.value : v)))
+                      }
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+              <Box sx={{ display: 'flex', gap: 2, mt: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button variant='contained' onClick={handleSaveNameservers} disabled={nsSaving}>
+                  {nsSaving ? 'Saving…' : 'Update Nameservers'}
+                </Button>
+                <Typography variant='caption' color='text.secondary'>
+                  Cloudflare: add the domain in Cloudflare, then paste the two assigned
+                  <code> *.ns.cloudflare.com </code> nameservers here and save.
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      )}
+
       {/* DNS Records Table */}
       <Grid size={{ xs: 12 }}>
         <Card>
-          <CardHeader title='DNS Records' />
+          <CardHeader
+            title='DNS Records'
+            subheader={
+              (domains.find((d) => d.id === selectedDomain)?.nameservers ?? []).some((ns) =>
+                ns.toLowerCase().includes('cloudflare.com'),
+              )
+                ? 'Managed via Cloudflare — these are your live Cloudflare records.'
+                : undefined
+            }
+          />
           <CardContent>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>

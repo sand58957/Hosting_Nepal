@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { randomUUID } from 'crypto';
@@ -72,13 +77,33 @@ export class ContaboService {
     };
   }
 
+  /**
+   * Convert Contabo API rejections into meaningful HTTP errors instead of
+   * generic 500s (e.g. "start" during a reinstall → 400 with Contabo's reason).
+   */
+  private rethrowContaboError(error: unknown, path: string): never {
+    const e = error as { response?: { status?: number; data?: { message?: unknown } }; message?: string };
+    const raw = e?.response?.data?.message ?? e?.message ?? 'Contabo API error';
+    const msg = Array.isArray(raw) ? raw.join(', ') : String(raw);
+    const status = e?.response?.status;
+    this.logger.warn(`Contabo ${path} failed${status ? ` (${status})` : ''}: ${msg}`);
+    if (status && status >= 500) {
+      throw new ServiceUnavailableException(`Contabo is temporarily unavailable: ${msg}`);
+    }
+    throw new BadRequestException(`Contabo: ${msg}`);
+  }
+
   private async apiGet<T = any>(
     path: string,
     params?: Record<string, string | number | boolean>,
   ): Promise<T> {
     const headers = await this.getHeaders();
-    const { data } = await this.http.get<T>(path, { headers, params });
-    return data;
+    try {
+      const { data } = await this.http.get<T>(path, { headers, params });
+      return data;
+    } catch (e) {
+      this.rethrowContaboError(e, `GET ${path}`);
+    }
   }
 
   private async apiPost<T = any>(
@@ -86,8 +111,12 @@ export class ContaboService {
     body?: Record<string, unknown>,
   ): Promise<T> {
     const headers = await this.getHeaders();
-    const { data } = await this.http.post<T>(path, body ?? {}, { headers });
-    return data;
+    try {
+      const { data } = await this.http.post<T>(path, body ?? {}, { headers });
+      return data;
+    } catch (e) {
+      this.rethrowContaboError(e, `POST ${path}`);
+    }
   }
 
   private async apiPut<T = any>(
@@ -95,8 +124,12 @@ export class ContaboService {
     body?: Record<string, unknown>,
   ): Promise<T> {
     const headers = await this.getHeaders();
-    const { data } = await this.http.put<T>(path, body ?? {}, { headers });
-    return data;
+    try {
+      const { data } = await this.http.put<T>(path, body ?? {}, { headers });
+      return data;
+    } catch (e) {
+      this.rethrowContaboError(e, `PUT ${path}`);
+    }
   }
 
   private async apiPatch<T = any>(
@@ -104,14 +137,22 @@ export class ContaboService {
     body?: Record<string, unknown>,
   ): Promise<T> {
     const headers = await this.getHeaders();
-    const { data } = await this.http.patch<T>(path, body ?? {}, { headers });
-    return data;
+    try {
+      const { data } = await this.http.patch<T>(path, body ?? {}, { headers });
+      return data;
+    } catch (e) {
+      this.rethrowContaboError(e, `PATCH ${path}`);
+    }
   }
 
   private async apiDelete<T = any>(path: string): Promise<T> {
     const headers = await this.getHeaders();
-    const { data } = await this.http.delete<T>(path, { headers });
-    return data;
+    try {
+      const { data } = await this.http.delete<T>(path, { headers });
+      return data;
+    } catch (e) {
+      this.rethrowContaboError(e, `DELETE ${path}`);
+    }
   }
 
   // ── Instance Management ─────────────────────────────────────────────────────
@@ -122,6 +163,24 @@ export class ContaboService {
 
   async getInstance(instanceId: number): Promise<any> {
     return this.apiGet(`/compute/instances/${instanceId}`);
+  }
+
+  /**
+   * Contabo's `displayName` field only accepts "numbers, letters, spaces and -".
+   * Callers pass the customer's hostname (e.g. `server.utpl.com.np`) or
+   * `wp-<domain>`, both of which contain dots — Contabo then rejects the whole
+   * createInstance call with HTTP 400 ("Only numbers, letters, spaces and -
+   * allowed."), failing provisioning and leaving the VPS SUSPENDED. Replace any
+   * disallowed character with a hyphen, collapse/trim runs, and cap length.
+   */
+  static sanitizeDisplayName(name: string): string {
+    const cleaned = (name || '')
+      .replace(/[^A-Za-z0-9 -]/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .trim()
+      .slice(0, 255);
+    return cleaned || 'vps';
   }
 
   async createInstance(params: {
@@ -142,7 +201,8 @@ export class ContaboService {
       region: params.region,
       period: params.period ?? 1,
     };
-    if (params.displayName) body.displayName = params.displayName;
+    if (params.displayName)
+      body.displayName = ContaboService.sanitizeDisplayName(params.displayName);
     if (params.defaultUser) body.defaultUser = params.defaultUser;
     if (params.rootPassword) body.rootPassword = params.rootPassword;
     if (params.sshKeys && params.sshKeys.length > 0)
@@ -193,11 +253,13 @@ export class ContaboService {
     defaultUser?: string,
     rootPassword?: number,
     sshKeys?: number[],
+    userData?: string,
   ): Promise<any> {
     const body: Record<string, unknown> = { imageId };
     if (defaultUser) body.defaultUser = defaultUser;
     if (rootPassword) body.rootPassword = rootPassword;
     if (sshKeys && sshKeys.length > 0) body.sshKeys = sshKeys;
+    if (userData) body.userData = Buffer.from(userData).toString('base64');
 
     this.logger.log(
       `Reinstalling Contabo instance ${instanceId} with image ${imageId}`,

@@ -13,7 +13,6 @@ import Divider from '@mui/material/Divider'
 import MenuItem from '@mui/material/MenuItem'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
-import Avatar from '@mui/material/Avatar'
 import Skeleton from '@mui/material/Skeleton'
 
 import CustomTextField from '@core/components/mui/TextField'
@@ -21,13 +20,10 @@ import api from '@/lib/api'
 
 interface VPSServer {
   id: string
-  hostname: string
-  ipAddress: string
   planName: string
-  cpu: number
-  ram: number
-  disk: number
-  price: number
+  planType: string
+  status: string
+  ipAddress: string | null
 }
 
 interface UpgradePlan {
@@ -39,51 +35,77 @@ interface UpgradePlan {
   price: number
 }
 
-const allPlans: UpgradePlan[] = [
-  { id: 'vps-1', name: 'VPS-1', cpu: 1, ram: 1, disk: 25, price: 999 },
-  { id: 'vps-2', name: 'VPS-2', cpu: 2, ram: 2, disk: 50, price: 1799 },
-  { id: 'vps-4', name: 'VPS-4', cpu: 4, ram: 4, disk: 100, price: 3499 },
-  { id: 'vps-8', name: 'VPS-8', cpu: 8, ram: 8, disk: 200, price: 6499 },
-]
-
 const VPSUpgradePage = () => {
   const [servers, setServers] = useState<VPSServer[]>([])
+  const [plans, setPlans] = useState<UpgradePlan[]>([])
   const [selectedServer, setSelectedServer] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<UpgradePlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [upgrading, setUpgrading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchServers = async () => {
+    const fetchAll = async () => {
       try {
-        const res = await api.get('/hosting')
-        const raw = res.data?.data?.data ?? res.data?.data ?? res.data
-        const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
-        const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'vds'
+        const [hostingRes, plansRes] = await Promise.all([
+          api.get('/hosting'),
+          api.get('/hosting/plans'),
+        ])
+
+        const rawH = hostingRes.data?.data?.data ?? hostingRes.data?.data ?? hostingRes.data
+        const list = Array.isArray(rawH) ? rawH : rawH?.data ?? []
+        // HostingAccount rows: VPS/VDS orders are stored with planType 'VPS'
+        setServers(
+          (Array.isArray(list) ? list : []).filter(
+            (h: any) => h.planType === 'VPS' && (h.status === 'ACTIVE' || h.status === 'PROVISIONING'),
+          ),
         )
-        setServers(vpsList)
+
+        const rawP = plansRes.data?.data ?? plansRes.data
+        const planList = Array.isArray(rawP) ? rawP : rawP?.data ?? []
+        setPlans(
+          (Array.isArray(planList) ? planList : [])
+            .filter((p: any) => p.type === 'VPS' || p.type === 'VDS')
+            .map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              cpu: p.specs?.cpuCores || 0,
+              ram: p.specs?.ramGB || 0,
+              disk: p.specs?.diskGB || 0,
+              price: p.priceMonthly || 0,
+            })),
+        )
       } catch {
         setServers([])
       } finally {
         setLoading(false)
       }
     }
-    fetchServers()
+    fetchAll()
   }, [])
 
   const currentServer = servers.find((s) => s.id === selectedServer)
-  const currentPlanIndex = allPlans.findIndex((p) => p.price <= (currentServer?.price || 0))
-  const availablePlans = allPlans.filter((p) => p.price > (currentServer?.price || 0))
+  const currentPlan = plans.find((p) => p.name === currentServer?.planName)
+  const availablePlans = plans.filter((p) => p.price > (currentPlan?.price ?? 0))
 
   const handleUpgrade = async () => {
     if (!selectedServer || !selectedPlan) return
+    setError(null)
     setUpgrading(true)
     try {
-      await api.post(`/hosting/vps/${selectedServer}/upgrade`, { planId: selectedPlan.id })
+      const res = await api.post(`/hosting/vps/${selectedServer}/upgrade`, {
+        newPlanId: selectedPlan.id,
+      })
+      const d = res.data?.data ?? res.data
+      setSuccessMsg(
+        d?.message ||
+          'Upgrade request submitted. An administrator will apply it shortly — your server keeps running until then.',
+      )
       setSelectedPlan(null)
-    } catch {
-      // silently handle
+    } catch (e: any) {
+      const msg = e?.response?.data?.message
+      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Upgrade request failed. Please try again.')
     } finally {
       setUpgrading(false)
     }
@@ -100,22 +122,37 @@ const VPSUpgradePage = () => {
         </Box>
       </Grid>
 
+      {successMsg && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='success' onClose={() => setSuccessMsg(null)}>{successMsg}</Alert>
+        </Grid>
+      )}
+      {error && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity='error' onClose={() => setError(null)}>{error}</Alert>
+        </Grid>
+      )}
+
       <Grid size={{ xs: 12 }}>
         <Card>
           <CardContent>
             {loading ? (
               <Skeleton variant='rectangular' height={56} />
+            ) : servers.length === 0 ? (
+              <Alert severity='info'>
+                You don’t have any active VPS yet. Order one under <strong>Order New VPS</strong> first.
+              </Alert>
             ) : (
               <CustomTextField
                 select
                 label='Select Server'
                 value={selectedServer}
-                onChange={(e) => { setSelectedServer(e.target.value); setSelectedPlan(null) }}
+                onChange={(e) => { setSelectedServer(e.target.value); setSelectedPlan(null); setSuccessMsg(null) }}
                 fullWidth
               >
                 {servers.map((s) => (
                   <MenuItem key={s.id} value={s.id}>
-                    {s.hostname || s.ipAddress} ({s.planName})
+                    {s.planName} {s.ipAddress ? `— ${s.ipAddress}` : ''} ({s.status})
                   </MenuItem>
                 ))}
               </CustomTextField>
@@ -131,24 +168,28 @@ const VPSUpgradePage = () => {
             <Card variant='outlined' sx={{ height: '100%' }}>
               <CardContent sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant='overline' color='text.secondary'>Current Plan</Typography>
-                <Typography variant='h5' sx={{ mb: 2 }}>{currentServer.planName || 'Current'}</Typography>
+                <Typography variant='h5' sx={{ mb: 2 }}>{currentServer.planName}</Typography>
                 <Divider sx={{ my: 2 }} />
-                <Box sx={{ textAlign: 'left' }}>
-                  <Typography variant='body2' sx={{ mb: 0.5 }}>
-                    <i className='tabler-cpu' style={{ fontSize: 14, marginRight: 6 }} />
-                    {currentServer.cpu || '?'} vCPU
-                  </Typography>
-                  <Typography variant='body2' sx={{ mb: 0.5 }}>
-                    <i className='tabler-device-desktop-analytics' style={{ fontSize: 14, marginRight: 6 }} />
-                    {currentServer.ram || '?'} GB RAM
-                  </Typography>
-                  <Typography variant='body2' sx={{ mb: 0.5 }}>
-                    <i className='tabler-database' style={{ fontSize: 14, marginRight: 6 }} />
-                    {currentServer.disk || '?'} GB SSD
-                  </Typography>
-                </Box>
+                {currentPlan ? (
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant='body2' sx={{ mb: 0.5 }}>
+                      <i className='tabler-cpu' style={{ fontSize: 14, marginRight: 6 }} />
+                      {currentPlan.cpu} vCPU
+                    </Typography>
+                    <Typography variant='body2' sx={{ mb: 0.5 }}>
+                      <i className='tabler-device-desktop-analytics' style={{ fontSize: 14, marginRight: 6 }} />
+                      {currentPlan.ram} GB RAM
+                    </Typography>
+                    <Typography variant='body2' sx={{ mb: 0.5 }}>
+                      <i className='tabler-database' style={{ fontSize: 14, marginRight: 6 }} />
+                      {currentPlan.disk} GB SSD
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography variant='body2' color='text.secondary'>Plan details unavailable</Typography>
+                )}
                 <Typography variant='h6' color='primary.main' sx={{ mt: 2 }}>
-                  NPR {(currentServer.price || 0).toLocaleString()}/mo
+                  NPR {(currentPlan?.price ?? 0).toLocaleString()}/mo
                 </Typography>
               </CardContent>
             </Card>
@@ -189,14 +230,12 @@ const VPSUpgradePage = () => {
                         <Typography variant='h6' color='primary.main' sx={{ mt: 1 }}>
                           NPR {plan.price.toLocaleString()}/mo
                         </Typography>
-                        {currentServer.price && (
-                          <Chip
-                            label={`+NPR ${(plan.price - (currentServer.price || 0)).toLocaleString()}/mo`}
-                            size='small'
-                            color='info'
-                            sx={{ mt: 1 }}
-                          />
-                        )}
+                        <Chip
+                          label={`+NPR ${(plan.price - (currentPlan?.price ?? 0)).toLocaleString()}/mo`}
+                          size='small'
+                          color='info'
+                          sx={{ mt: 1 }}
+                        />
                       </CardContent>
                     </Card>
                   </Grid>
@@ -209,16 +248,17 @@ const VPSUpgradePage = () => {
             <Grid size={{ xs: 12 }}>
               <Card>
                 <CardContent>
-                  <Alert severity='warning' sx={{ mb: 3 }}>
-                    Upgrade requires a brief restart of your server. Plan your upgrade during low-traffic periods.
+                  <Alert severity='info' sx={{ mb: 3 }}>
+                    Plan upgrades are applied by our team (a brief restart may be required).
+                    Your request goes to an administrator and your server keeps running until the upgrade is applied.
                   </Alert>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
                       <Typography variant='body1'>
-                        Upgrading to <strong>{selectedPlan.name}</strong>
+                        Upgrading <strong>{currentServer.planName}</strong> → <strong>{selectedPlan.name}</strong>
                       </Typography>
                       <Typography variant='body2' color='text.secondary'>
-                        Price difference: NPR {(selectedPlan.price - (currentServer.price || 0)).toLocaleString()}/mo
+                        Price difference: NPR {(selectedPlan.price - (currentPlan?.price ?? 0)).toLocaleString()}/mo
                       </Typography>
                     </Box>
                     <Button
@@ -228,7 +268,7 @@ const VPSUpgradePage = () => {
                       disabled={upgrading}
                       startIcon={upgrading ? <CircularProgress size={20} /> : <i className='tabler-arrow-up' />}
                     >
-                      {upgrading ? 'Upgrading...' : 'Upgrade Now'}
+                      {upgrading ? 'Submitting...' : 'Request Upgrade'}
                     </Button>
                   </Box>
                 </CardContent>

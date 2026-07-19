@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -52,7 +53,26 @@ export interface PromoValidationResult {
 }
 
 @Injectable()
-export class BillingService {
+export class BillingService implements OnModuleInit {
+  /** Register the daily dunning sweep (09:00 server time) as a Bull repeatable job. */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.paymentQueue.add(
+        BILLING_JOBS.DUNNING_SWEEP,
+        {},
+        {
+          repeat: { cron: '0 9 * * *' },
+          jobId: 'dunning-sweep-daily',
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+      this.logger.log('Daily dunning sweep scheduled (09:00, bull repeatable)');
+    } catch (e) {
+      this.logger.warn(`Could not schedule dunning sweep: ${(e as Error).message}`);
+    }
+  }
+
   private readonly logger = new Logger(BillingService.name);
   private readonly appUrl: string;
 
@@ -81,9 +101,20 @@ export class BillingService {
       subtotal += item.amountNpr * quantity * item.durationMonths;
     }
 
-    // Apply promo code discount
+    // Per-user billing exemption: a SUPER_ADMIN can mark a user as free (User.isFree).
+    // Free users' orders are auto-zeroed and auto-completed via an ADMIN_CREDIT payment,
+    // so they never reach a payment step. Promo codes are ignored (the whole amount is waived).
+    const billingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isFree: true },
+    });
+    const isFreeUser = billingUser?.isFree === true;
+
+    // Apply promo code discount (skipped entirely for free users)
     let discountAmount = 0;
-    if (dto.promoCode) {
+    if (isFreeUser) {
+      discountAmount = subtotal; // waive the full amount
+    } else if (dto.promoCode) {
       const promoResult = await this.validatePromoCode(
         dto.promoCode,
         dto.items[0].serviceType,
@@ -119,8 +150,8 @@ export class BillingService {
           vatAmountNpr: vatAmount,
           totalAmountNpr: totalAmount,
           discountAmountNpr: discountAmount,
-          promoCode: dto.promoCode || null,
-          status: 'PENDING',
+          promoCode: isFreeUser ? null : dto.promoCode || null,
+          status: isFreeUser ? 'COMPLETED' : 'PENDING',
           notes: dto.items.length > 1
             ? JSON.stringify(
                 dto.items.map((item) => ({
@@ -136,8 +167,8 @@ export class BillingService {
         },
       });
 
-      // Increment promo code usage
-      if (dto.promoCode) {
+      // Increment promo code usage (never for free users — no code was applied)
+      if (!isFreeUser && dto.promoCode) {
         await tx.promoCode.updateMany({
           where: { code: dto.promoCode.toUpperCase() },
           data: { usedCount: { increment: 1 } },
@@ -152,17 +183,130 @@ export class BillingService {
         discountAmount,
       );
 
-      return { order, invoice };
+      // Free users: settle the order immediately with an ADMIN_CREDIT payment,
+      // mirroring processWalletPayment so the end-state matches a normally-paid order.
+      let payment: { id: string } | null = null;
+      if (isFreeUser) {
+        payment = await tx.payment.create({
+          data: {
+            orderId: order.id,
+            userId,
+            gateway: 'ADMIN_CREDIT',
+            amountNpr: 0,
+            status: 'COMPLETED',
+            verifiedAt: new Date(),
+          },
+          select: { id: true },
+        });
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: { paymentId: payment.id },
+        });
+
+        await tx.invoice.updateMany({
+          where: { orderId: order.id, status: { not: 'CANCELLED' } },
+          data: { status: 'PAID', paidAt: new Date() },
+        });
+      }
+
+      return { order, invoice, payment };
     });
 
+    // Emit ORDER_PAID for free orders so the same listeners (receipts, future
+    // provisioning) treat them exactly like a paid order.
+    if (isFreeUser) {
+      this.eventEmitter.emit(BILLING_EVENTS.ORDER_PAID, {
+        orderId: result.order.id,
+        orderNumber: result.order.orderNumber,
+        userId,
+        gateway: 'ADMIN_CREDIT',
+        amount: 0,
+        paymentId: result.payment!.id,
+      });
+    }
+
     this.logger.log(
-      `Order ${orderNumber} created for user ${userId}. Total: ${totalAmount} NPR`,
+      isFreeUser
+        ? `Order ${orderNumber} auto-completed FREE (billing-exempt) for user ${userId} via ADMIN_CREDIT.`
+        : `Order ${orderNumber} created for user ${userId}. Total: ${totalAmount} NPR`,
     );
 
     return {
       order: result.order,
       invoice: result.invoice,
+      freeExempt: isFreeUser,
+      requiresPayment: !isFreeUser,
     };
+  }
+
+  /**
+   * Whether a user is billing-exempt (free). A SUPER_ADMIN can toggle this via
+   * the admin "make free" action; when true the user is never charged.
+   */
+  private async isUserFree(userId: string): Promise<boolean> {
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isFree: true },
+    });
+    return u?.isFree === true;
+  }
+
+  /**
+   * Settle an ALREADY-CREATED order for free: zero its totals, attach a COMPLETED
+   * ADMIN_CREDIT payment, mark its invoices PAID, and emit ORDER_PAID so it ends
+   * up in the same state as a normally-paid order. Used by the renewal / upgrade /
+   * initiatePayment paths for billing-exempt users. (createOrder settles inline
+   * within its own creation transaction so order+payment+invoice stay atomic.)
+   */
+  private async settleFreeOrder(
+    order: { id: string; orderNumber: string; amountNpr: number },
+    userId: string,
+  ): Promise<void> {
+    const paymentId = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          orderId: order.id,
+          userId,
+          gateway: 'ADMIN_CREDIT',
+          amountNpr: 0,
+          status: 'COMPLETED',
+          verifiedAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          discountAmountNpr: order.amountNpr,
+          vatAmountNpr: 0,
+          totalAmountNpr: 0,
+          status: 'COMPLETED',
+          paymentId: payment.id,
+        },
+      });
+
+      await tx.invoice.updateMany({
+        where: { orderId: order.id, status: { not: 'CANCELLED' } },
+        data: { status: 'PAID', paidAt: new Date() },
+      });
+
+      return payment.id;
+    });
+
+    this.eventEmitter.emit(BILLING_EVENTS.ORDER_PAID, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      userId,
+      gateway: 'ADMIN_CREDIT',
+      amount: 0,
+      paymentId,
+    });
+
+    this.logger.log(
+      `Order ${order.orderNumber} auto-settled FREE (billing-exempt) for user ${userId} via ADMIN_CREDIT.`,
+    );
   }
 
   async getOrders(userId: string, options: PaginationOptions) {
@@ -234,10 +378,48 @@ export class BillingService {
   ) {
     const order = await this.getOrderById(userId, orderId);
 
+    // Billing-exempt (free) users' orders are auto-completed at creation, so there is
+    // nothing to pay. Respond idempotently (same shape as a normal initiation) instead
+    // of erroring if asked to pay again.
+    if (order.status === 'COMPLETED') {
+      return {
+        alreadyPaid: true,
+        paymentId: null,
+        gateway: 'ADMIN_CREDIT' as PaymentGateway,
+        paymentUrl: null,
+        formData: null,
+        status: 'COMPLETED',
+        orderId: order.id,
+        totalAmountNpr: order.totalAmountNpr,
+      };
+    }
+
     if (order.status !== 'PENDING') {
       throw new BadRequestException(
         `Cannot initiate payment for order with status ${order.status}`,
       );
+    }
+
+    // If the user was marked billing-exempt AFTER this order was created, settle it
+    // for free now rather than charging any gateway or wallet (covers both).
+    // EXCEPTION: a wallet top-up must NOT be free-settled — settleFreeOrder zeros the
+    // order and never credits the wallet, so the top-up would vanish. For top-ups we
+    // credit the wallet and complete the order via the normal crediting path instead.
+    if (await this.isUserFree(userId)) {
+      if (this.isWalletTopupOrder(order)) {
+        return this.completeWalletTopup(userId, order);
+      }
+      await this.settleFreeOrder(order, userId);
+      return {
+        alreadyPaid: true,
+        paymentId: null,
+        gateway: 'ADMIN_CREDIT' as PaymentGateway,
+        paymentUrl: null,
+        formData: null,
+        status: 'COMPLETED',
+        orderId: order.id,
+        totalAmountNpr: 0,
+      };
     }
 
     // Check for existing pending payment and expire it
@@ -354,7 +536,7 @@ export class BillingService {
     }
 
     // Deduct from wallet and complete payment in transaction
-    await this.prisma.$transaction(async (tx) => {
+    const walletPaymentId = await this.prisma.$transaction(async (tx) => {
       if (reseller) {
         await tx.reseller.update({
           where: { userId },
@@ -364,7 +546,7 @@ export class BillingService {
         });
       }
 
-      await tx.payment.create({
+      const payment = await tx.payment.create({
         data: {
           orderId: order.id,
           userId,
@@ -373,11 +555,12 @@ export class BillingService {
           status: 'COMPLETED',
           verifiedAt: new Date(),
         },
+        select: { id: true },
       });
 
       await tx.order.update({
         where: { id: order.id },
-        data: { status: 'COMPLETED' },
+        data: { status: 'COMPLETED', paymentId: payment.id },
       });
 
       // Mark related invoices as paid
@@ -385,6 +568,8 @@ export class BillingService {
         where: { orderId: order.id, status: { not: 'CANCELLED' } },
         data: { status: 'PAID', paidAt: new Date() },
       });
+
+      return payment.id;
     });
 
     this.eventEmitter.emit(BILLING_EVENTS.ORDER_PAID, {
@@ -393,6 +578,7 @@ export class BillingService {
       userId,
       gateway: 'WALLET',
       amount: order.totalAmountNpr,
+      paymentId: walletPaymentId,
     });
 
     this.logger.log(
@@ -400,7 +586,7 @@ export class BillingService {
     );
 
     return {
-      paymentId: null,
+      paymentId: walletPaymentId,
       paymentUrl: null,
       formData: null,
       gateway: 'WALLET' as PaymentGateway,
@@ -665,6 +851,15 @@ export class BillingService {
       0,
     );
 
+    // Billing-exempt users: settle the upgrade for free instead of charging.
+    if (await this.isUserFree(userId)) {
+      await this.settleFreeOrder(upgradeOrder, userId);
+      upgradeOrder.status = 'COMPLETED';
+      upgradeOrder.discountAmountNpr = upgradeOrder.amountNpr;
+      upgradeOrder.vatAmountNpr = 0;
+      upgradeOrder.totalAmountNpr = 0;
+    }
+
     this.logger.log(
       `Upgrade order ${upgradeOrderNumber} created. Credit: ${creditAmount}, New total: ${totalAmount}`,
     );
@@ -723,6 +918,15 @@ export class BillingService {
       order.amountNpr,
       0,
     );
+
+    // Billing-exempt users: settle the renewal for free instead of charging.
+    if (await this.isUserFree(userId)) {
+      await this.settleFreeOrder(renewalOrder, userId);
+      renewalOrder.status = 'COMPLETED';
+      renewalOrder.discountAmountNpr = renewalOrder.amountNpr;
+      renewalOrder.vatAmountNpr = 0;
+      renewalOrder.totalAmountNpr = 0;
+    }
 
     this.logger.log(
       `Renewal order ${renewalOrderNumber} created for original order ${order.orderNumber}`,
@@ -824,6 +1028,24 @@ export class BillingService {
       },
     });
 
+    // Billing-exempt (free) users: credit the wallet directly instead of routing
+    // through a gateway. We must NOT free-settle a top-up order (settleFreeOrder
+    // zeros it and never credits the wallet), so the balance is increased here via
+    // the normal creditWallet path and the order is completed.
+    if (await this.isUserFree(userId)) {
+      const result = await this.completeWalletTopup(userId, {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        amountNpr: order.amountNpr,
+        totalAmountNpr: order.totalAmountNpr,
+      });
+      return {
+        orderId: order.id,
+        orderNumber,
+        ...result,
+      };
+    }
+
     // Initiate payment
     const paymentResult = await this.initiatePayment(
       userId,
@@ -835,6 +1057,92 @@ export class BillingService {
       orderId: order.id,
       orderNumber,
       ...paymentResult,
+    };
+  }
+
+  /**
+   * True if the order is a wallet top-up (tagged in createOrder/topupWallet as
+   * serviceType ADDON + planName 'wallet-topup', and notes.type === 'wallet-topup').
+   * Wallet top-ups must be credited to the wallet, never free-settled to zero.
+   */
+  private isWalletTopupOrder(order: {
+    serviceType: ServiceType;
+    planName: string | null;
+    notes: string | null;
+  }): boolean {
+    if (order.serviceType === 'ADDON' && order.planName === 'wallet-topup') {
+      return true;
+    }
+    if (order.notes) {
+      try {
+        const parsed = JSON.parse(order.notes) as { type?: string };
+        if (parsed.type === 'wallet-topup') return true;
+      } catch {
+        // notes not JSON — fall through
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Complete a wallet top-up order by crediting the user's wallet and marking the
+   * order/invoices PAID. Used for billing-exempt users (who skip the gateway) so the
+   * top-up actually increases the balance instead of being zeroed by settleFreeOrder.
+   * Records the credit as an ADMIN_CREDIT payment for an auditable, ORDER_PAID-emitting trail.
+   */
+  private async completeWalletTopup(
+    userId: string,
+    order: { id: string; orderNumber: string; amountNpr: number; totalAmountNpr: number },
+  ) {
+    // Credit the wallet first (throws BadRequestException for non-reseller users,
+    // matching processWalletPayment's reseller-only wallet assumption).
+    await this.creditWallet(userId, order.amountNpr, `Wallet top-up ${order.orderNumber}`);
+
+    const paymentId = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          orderId: order.id,
+          userId,
+          gateway: 'ADMIN_CREDIT',
+          amountNpr: order.amountNpr,
+          status: 'COMPLETED',
+          verifiedAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: 'COMPLETED', paymentId: payment.id },
+      });
+
+      await tx.invoice.updateMany({
+        where: { orderId: order.id, status: { not: 'CANCELLED' } },
+        data: { status: 'PAID', paidAt: new Date() },
+      });
+
+      return payment.id;
+    });
+
+    this.eventEmitter.emit(BILLING_EVENTS.ORDER_PAID, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      userId,
+      gateway: 'ADMIN_CREDIT',
+      amount: order.amountNpr,
+      paymentId,
+    });
+
+    this.logger.log(
+      `Wallet top-up ${order.orderNumber} credited ${order.amountNpr} NPR for billing-exempt user ${userId}.`,
+    );
+
+    return {
+      paymentId,
+      paymentUrl: null,
+      formData: null,
+      gateway: 'ADMIN_CREDIT' as PaymentGateway,
+      status: 'COMPLETED',
     };
   }
 
@@ -1009,6 +1317,91 @@ export class BillingService {
   }
 
   // ─── Payment & Transaction History ─────────────────────────────────────────────
+
+  // ─── Dunning (payment reminders & suspension warnings) ─────────────────────
+
+  /**
+   * Sweep unpaid invoices and emit per-user dunning events:
+   * - due within `reminderWindowDays`  → 'billing.payment-reminder'
+   * - past due                         → marked OVERDUE + 'billing.suspension-warning'
+   * Billing-exempt (isFree) users are skipped. Triggered by the SUPER_ADMIN
+   * endpoint POST /billing/admin/dunning-run (cron-able later).
+   */
+  async runDunningSweep(opts?: { reminderWindowDays?: number; graceDays?: number }) {
+    const windowDays = opts?.reminderWindowDays ?? 5;
+    const graceDays = opts?.graceDays ?? 4;
+    const now = new Date();
+    const windowEnd = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000);
+
+    // Only dun invoices that represent a real, active obligation:
+    //  - exclude DRAFT (nothing advances DRAFT→SENT, so abandoned/PENDING checkouts
+    //    would otherwise get false suspension + reactivation-fee threats);
+    //  - require the parent order to be active/paid (COMPLETED or PROCESSING), so
+    //    PENDING/CANCELLED/FAILED/REFUNDED orders are never dunned.
+    const unpaid = await this.prisma.invoice.findMany({
+      where: {
+        status: { in: ['SENT', 'OVERDUE'] },
+        totalNpr: { gt: 0 },
+        order: { status: { in: ['COMPLETED', 'PROCESSING'] } },
+      },
+      include: {
+        user: { select: { id: true, email: true, name: true, isFree: true } },
+        order: { select: { planName: true, serviceType: true } },
+      },
+    });
+
+    type Row = (typeof unpaid)[number];
+    const byUser = new Map<string, { user: Row['user']; overdue: Row[]; upcoming: Row[] }>();
+    for (const inv of unpaid) {
+      if (!inv.user?.email || inv.user.isFree) continue;
+      const bucket = byUser.get(inv.userId) ?? { user: inv.user, overdue: [], upcoming: [] };
+      if (inv.dueDate < now) bucket.overdue.push(inv);
+      else if (inv.dueDate <= windowEnd) bucket.upcoming.push(inv);
+      byUser.set(inv.userId, bucket);
+    }
+
+    let reminders = 0;
+    let warnings = 0;
+    const toService = (inv: Row) => ({
+      name: inv.order?.planName || inv.order?.serviceType || `Invoice ${inv.invoiceNumber}`,
+      paidUntil: inv.dueDate.toISOString().slice(0, 10),
+      amountNpr: inv.totalNpr,
+    });
+
+    for (const { user, overdue, upcoming } of byUser.values()) {
+      const firstName = user.name?.split(' ')[0] || 'Customer';
+      if (overdue.length > 0) {
+        await this.prisma.invoice.updateMany({
+          where: { id: { in: overdue.map((i) => i.id) } },
+          data: { status: 'OVERDUE' },
+        });
+        this.eventEmitter.emit('billing.suspension-warning', {
+          user: { email: user.email, firstName },
+          totalDueNpr: overdue.reduce((s, i) => s + i.totalNpr, 0),
+          graceDays,
+          services: overdue.map(toService),
+        });
+        warnings++;
+      } else if (upcoming.length > 0) {
+        const soonest = Math.max(
+          1,
+          Math.ceil((Math.min(...upcoming.map((i) => i.dueDate.getTime())) - now.getTime()) / 86_400_000),
+        );
+        this.eventEmitter.emit('billing.payment-reminder', {
+          user: { email: user.email, firstName },
+          totalDueNpr: upcoming.reduce((s, i) => s + i.totalNpr, 0),
+          daysLeft: soonest,
+          services: upcoming.map(toService),
+        });
+        reminders++;
+      }
+    }
+
+    this.logger.log(
+      `Dunning sweep: ${unpaid.length} unpaid invoices → ${reminders} reminders, ${warnings} suspension warnings`,
+    );
+    return { unpaidInvoices: unpaid.length, reminders, warnings };
+  }
 
   async getPaymentHistory(userId: string, options: PaginationOptions) {
     const page = options.page || 1;

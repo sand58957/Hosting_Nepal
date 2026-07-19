@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { HostingProvider } from '@prisma/client';
+import { HostingProvider, BillingCycle } from '@prisma/client';
 
 export class CreateVpsDto {
   @ApiProperty({ description: 'Hostname for the VPS' })
@@ -42,4 +42,13 @@ export class CreateVpsDto {
   @IsOptional()
   @IsString()
   containerStack?: string;
+
+  @ApiPropertyOptional({
+    enum: BillingCycle,
+    description: 'Contract billing term (price = monthly × months, no discount)',
+    default: 'MONTHLY',
+  })
+  @IsOptional()
+  @IsEnum(BillingCycle)
+  billingCycle?: BillingCycle;
 }

@@ -21,6 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { PaymentGateway } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { BillingService } from './billing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -35,6 +37,22 @@ export class BillingController {
   private readonly logger = new Logger(BillingController.name);
 
   constructor(private readonly billingService: BillingService) {}
+
+  // ─── Dunning (SUPER_ADMIN) ─────────────────────────────────────────────────────
+
+  @Post('admin/dunning-run')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Run the dunning sweep: payment reminders for invoices due soon, suspension warnings for overdue (SUPER_ADMIN)',
+  })
+  runDunningSweep() {
+    this.logger.log('SUPER_ADMIN triggered dunning sweep');
+    return this.billingService.runDunningSweep();
+  }
 
   // ─── Orders ────────────────────────────────────────────────────────────────────
 

@@ -45,6 +45,10 @@ const Register = ({ mode: _mode }: { mode: SystemMode }) => {
     try {
       const normalizedPhone = phone.replace(/[\s\-()]/g, '')
 
+      // A resolved (2xx) response means the backend accepted the registration.
+      // The response body is { message } wrapped by TransformInterceptor as
+      // { success, data: { message } } and contains no id, so treat any 2xx as success.
+      // Failures (4xx/5xx) reject and are handled in the catch block below.
       await api.post('/auth/register', { name, email, phone: normalizedPhone, password })
       setSuccess('Registration successful! Please check your email to verify your account.')
     } catch (err: unknown) {

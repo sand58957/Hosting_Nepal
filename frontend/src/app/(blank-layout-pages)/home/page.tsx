@@ -95,23 +95,29 @@ const faqs = [
 ]
 
 const popularTlds = ['.com', '.np', '.com.np', '.net', '.org', '.in', '.xyz', '.io']
-const planTabs = ['WORDPRESS', 'VPS', 'VDS', 'DEDICATED']
-const planTabLabels = ['WordPress', 'VPS', 'VDS', 'Dedicated']
+const planTabs = ['WORDPRESS', 'VPS', 'STORAGE_VPS', 'VDS', 'DEDICATED']
+const planTabLabels = ['WordPress', 'VPS', 'Storage VPS', 'VDS', 'Dedicated']
 
 const fallbackPlans: Plan[] = [
   { id: 'wp-starter', name: 'WP StartUp', type: 'WORDPRESS', priceMonthly: 1254, priceYearly: 7632, currency: 'NPR', features: [], specs: { diskGB: 10 }, },
   { id: 'wp-essential', name: 'WP Essential', type: 'WORDPRESS', priceMonthly: 1354, priceYearly: 8592, currency: 'NPR', features: [], specs: { diskGB: 20 }, },
   { id: 'wp-business', name: 'WP Business', type: 'WORDPRESS', priceMonthly: 1613, priceYearly: 11460, currency: 'NPR', features: [], specs: { diskGB: 30 }, popular: true },
   { id: 'wp-developer', name: 'WP Developer', type: 'WORDPRESS', priceMonthly: 1893, priceYearly: 14340, currency: 'NPR', features: [], specs: { diskGB: 40 }, },
-  { id: 'vps-10', name: 'VPS 10', type: 'VPS', priceMonthly: 799, priceYearly: 7990, currency: 'NPR', features: [], specs: { diskGB: 75, cpuCores: 4, ramGB: 8 }, },
-  { id: 'vps-20', name: 'VPS 20', type: 'VPS', priceMonthly: 1243, priceYearly: 12430, currency: 'NPR', features: [], specs: { diskGB: 100, cpuCores: 6, ramGB: 12 }, popular: true },
-  { id: 'vps-30', name: 'VPS 30', type: 'VPS', priceMonthly: 2486, priceYearly: 24860, currency: 'NPR', features: [], specs: { diskGB: 200, cpuCores: 8, ramGB: 24 }, },
-  { id: 'vps-40', name: 'VPS 40', type: 'VPS', priceMonthly: 4440, priceYearly: 44400, currency: 'NPR', features: [], specs: { diskGB: 250, cpuCores: 12, ramGB: 48 }, },
-  { id: 'vps-50', name: 'VPS 50', type: 'VPS', priceMonthly: 6571, priceYearly: 65710, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 16, ramGB: 64 }, },
-  { id: 'vds-s', name: 'VDS S', type: 'VDS', priceMonthly: 6110, priceYearly: 61100, currency: 'NPR', features: [], specs: { diskGB: 180, cpuCores: 3, ramGB: 24 }, },
-  { id: 'vds-m', name: 'VDS M', type: 'VDS', priceMonthly: 7956, priceYearly: 79560, currency: 'NPR', features: [], specs: { diskGB: 240, cpuCores: 4, ramGB: 32 }, popular: true },
-  { id: 'vds-l', name: 'VDS L', type: 'VDS', priceMonthly: 11366, priceYearly: 113660, currency: 'NPR', features: [], specs: { diskGB: 360, cpuCores: 6, ramGB: 48 }, },
-  { id: 'vds-xl', name: 'VDS XL', type: 'VDS', priceMonthly: 14634, priceYearly: 146340, currency: 'NPR', features: [], specs: { diskGB: 480, cpuCores: 8, ramGB: 64 }, },
+  { id: 'vps-10', name: 'VPS 10', type: 'VPS', priceMonthly: 1228, priceYearly: 12280, currency: 'NPR', features: [], specs: { diskGB: 75, cpuCores: 4, ramGB: 8 }, },
+  { id: 'vps-20', name: 'VPS 20', type: 'VPS', priceMonthly: 1674, priceYearly: 16740, currency: 'NPR', features: [], specs: { diskGB: 100, cpuCores: 6, ramGB: 12 }, popular: true },
+  { id: 'vps-30', name: 'VPS 30', type: 'VPS', priceMonthly: 3125, priceYearly: 31250, currency: 'NPR', features: [], specs: { diskGB: 200, cpuCores: 8, ramGB: 24 }, },
+  { id: 'vps-40', name: 'VPS 40', type: 'VPS', priceMonthly: 5580, priceYearly: 55800, currency: 'NPR', features: [], specs: { diskGB: 250, cpuCores: 12, ramGB: 48 }, },
+  { id: 'vps-50', name: 'VPS 50', type: 'VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 16, ramGB: 64 }, },
+  { id: 'vps-60', name: 'VPS 60', type: 'VPS', priceMonthly: 10937, priceYearly: 109370, currency: 'NPR', features: [], specs: { diskGB: 350, cpuCores: 18, ramGB: 96 }, },
+  { id: 'storage-vps-10', name: 'Storage VPS 10', type: 'STORAGE_VPS', priceMonthly: 1228, priceYearly: 12280, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 2, ramGB: 4 }, },
+  { id: 'storage-vps-30', name: 'Storage VPS 30', type: 'STORAGE_VPS', priceMonthly: 3125, priceYearly: 31250, currency: 'NPR', features: [], specs: { diskGB: 1000, cpuCores: 6, ramGB: 18 }, },
+  { id: 'storage-vps-40', name: 'Storage VPS 40', type: 'STORAGE_VPS', priceMonthly: 5580, priceYearly: 55800, currency: 'NPR', features: [], specs: { diskGB: 1200, cpuCores: 8, ramGB: 30 }, },
+  { id: 'storage-vps-50', name: 'Storage VPS 50', type: 'STORAGE_VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 1400, cpuCores: 14, ramGB: 50 }, },
+  { id: 'vds-s', name: 'VDS S', type: 'VDS', priceMonthly: 8631, priceYearly: 86310, currency: 'NPR', features: [], specs: { diskGB: 180, cpuCores: 3, ramGB: 24 }, },
+  { id: 'vds-m', name: 'VDS M', type: 'VDS', priceMonthly: 10268, priceYearly: 102680, currency: 'NPR', features: [], specs: { diskGB: 240, cpuCores: 4, ramGB: 32 }, popular: true },
+  { id: 'vds-l', name: 'VDS L', type: 'VDS', priceMonthly: 15476, priceYearly: 154760, currency: 'NPR', features: [], specs: { diskGB: 360, cpuCores: 6, ramGB: 48 }, },
+  { id: 'vds-xl', name: 'VDS XL', type: 'VDS', priceMonthly: 20535, priceYearly: 205350, currency: 'NPR', features: [], specs: { diskGB: 480, cpuCores: 8, ramGB: 64 }, },
+  { id: 'vds-xxl', name: 'VDS XXL', type: 'VDS', priceMonthly: 29016, priceYearly: 290160, currency: 'NPR', features: [], specs: { diskGB: 720, cpuCores: 12, ramGB: 96 }, },
   { id: 'ded-1', name: 'DS Intel Xeon E3', type: 'DEDICATED', priceMonthly: 16956, priceYearly: 169560, currency: 'NPR', features: [], specs: { diskGB: 500, cpuCores: 4, ramGB: 8 }, },
   { id: 'ded-2', name: 'DS Intel Xeon E5', type: 'DEDICATED', priceMonthly: 17949, priceYearly: 179490, currency: 'NPR', features: [], specs: { diskGB: 1000, cpuCores: 8, ramGB: 16 }, popular: true },
   { id: 'ded-3', name: 'DS Dual Xeon E5', type: 'DEDICATED', priceMonthly: 23139, priceYearly: 231390, currency: 'NPR', features: [], specs: { diskGB: 2000, cpuCores: 16, ramGB: 32 }, },
@@ -184,6 +190,226 @@ const useScrollAnimations = () => {
       window.removeEventListener('resize', onScroll)
     }
   }, [])
+}
+
+// ── Mega Navbar ───────────────────────────────────────────────────────────────
+const MegaNavbar = ({ scrollTo }: { scrollTo: (id: string) => void }) => {
+  const router = useRouter()
+
+  const navMenus = [
+    {
+      label: 'Hosting', items: [
+        { icon: 'tabler-brand-wordpress', title: 'WordPress Hosting', desc: 'Managed WP with LiteSpeed & CyberPanel', link: '/hosting/plans' },
+        { icon: 'tabler-server', title: 'VPS Hosting', desc: 'Full root access, NVMe SSD, scalable', link: '/vps/order' },
+        { icon: 'tabler-server-cog', title: 'VDS Hosting', desc: 'Dedicated CPU & RAM, enterprise grade', link: '/vps/vds/order' },
+        { icon: 'tabler-database', title: 'Dedicated Server', desc: 'Bare metal, Intel Xeon, max performance', link: '/vps/dedicated/order' },
+      ]
+    },
+    {
+      label: 'Domains', items: [
+        { icon: 'tabler-world', title: 'Register Domain', desc: '.com, .np, .com.np from NPR 1,200', link: '/domains/search' },
+        { icon: 'tabler-transfer', title: 'Transfer Domain', desc: 'Move your domain with free extension', link: '/domains/transfers' },
+        { icon: 'tabler-dns', title: 'DNS Management', desc: 'Advanced DNS with full record support', link: '/domains/dns' },
+        { icon: 'tabler-shield-lock', title: 'WHOIS Privacy', desc: 'Protect your identity for free', link: '/domains' },
+      ]
+    },
+    {
+      label: 'Email', items: [
+        { icon: 'tabler-mail', title: 'Business Email', desc: 'Professional email with your domain', link: '/email' },
+        { icon: 'tabler-brand-google', title: 'Google Workspace', desc: 'Gmail, Drive, Meet for teams', link: '/email/google-workspace' },
+        { icon: 'tabler-mail-cog', title: 'Titan Email', desc: 'Built for business communication', link: '/email/titan' },
+      ]
+    },
+    {
+      label: 'Security', items: [
+        { icon: 'tabler-lock', title: 'SSL Certificates', desc: 'Free & premium SSL for every site', link: '/ssl' },
+        { icon: 'tabler-shield-check', title: 'DDoS Protection', desc: 'Always-on attack mitigation', link: '/vps' },
+        { icon: 'tabler-scan', title: 'Malware Scanner', desc: 'Auto-detect & remove threats', link: '/hosting/security/scanner' },
+      ]
+    },
+  ]
+
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [mobileExpanded, setMobileExpanded] = useState<string | null>(null)
+  const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleEnter = (label: string) => {
+    if (navTimeout.current) clearTimeout(navTimeout.current)
+    setActiveMenu(label)
+  }
+  const handleLeave = () => {
+    navTimeout.current = setTimeout(() => setActiveMenu(null), 200)
+  }
+
+  return (
+    <>
+      <Box sx={{
+        position: 'sticky', top: 0, zIndex: 1100,
+        bgcolor: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <Container maxWidth='lg'>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 64 }}>
+            {/* Logo */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', minWidth: 0 }} onClick={() => scrollTo('hero')}>
+              <Logo />
+              <Typography variant='h6' fontWeight={800} sx={{ color: '#fff', whiteSpace: 'nowrap' }}>Hosting Nepal</Typography>
+            </Box>
+
+            {/* Desktop Nav */}
+            <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 0.5, alignItems: 'center' }}>
+              {navMenus.map(menu => (
+                <Box key={menu.label} onMouseEnter={() => handleEnter(menu.label)} onMouseLeave={handleLeave}
+                  sx={{ position: 'relative' }}>
+                  <Button size='small' endIcon={<i className='tabler-chevron-down' style={{ fontSize: 14, transition: '0.2s', transform: activeMenu === menu.label ? 'rotate(180deg)' : 'none' }} />}
+                    sx={{
+                      color: activeMenu === menu.label ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none',
+                      borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+                    }}>
+                    {menu.label}
+                  </Button>
+
+                  {/* Dropdown Mega Menu */}
+                  <Box onMouseEnter={() => handleEnter(menu.label)} onMouseLeave={handleLeave}
+                    sx={{
+                      position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+                      pt: 1, opacity: activeMenu === menu.label ? 1 : 0,
+                      pointerEvents: activeMenu === menu.label ? 'auto' : 'none',
+                      transition: 'opacity 0.2s ease, transform 0.2s ease',
+                    }}>
+                    <Paper elevation={0} sx={{
+                      bgcolor: 'rgba(20,20,38,0.98)', backdropFilter: 'blur(24px)',
+                      border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3,
+                      p: 1.5, minWidth: 320, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                    }}>
+                      {menu.items.map(item => (
+                        <Box key={item.title} onClick={() => { router.push(item.link); setActiveMenu(null) }}
+                          sx={{
+                            display: 'flex', gap: 2, p: 1.5, borderRadius: 2, cursor: 'pointer',
+                            transition: '0.2s', '&:hover': { bgcolor: 'rgba(115,103,240,0.08)' },
+                          }}>
+                          <Box sx={{
+                            width: 40, height: 40, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            bgcolor: 'rgba(115,103,240,0.1)', color: '#7367F0', flexShrink: 0,
+                          }}>
+                            <i className={item.icon} style={{ fontSize: 20 }} />
+                          </Box>
+                          <Box>
+                            <Typography variant='body2' fontWeight={600} sx={{ color: '#fff', lineHeight: 1.4 }}>{item.title}</Typography>
+                            <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 }}>{item.desc}</Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Paper>
+                  </Box>
+                </Box>
+              ))}
+
+              {/* Direct links */}
+              <Button size='small' onClick={() => router.push('/articles')}
+                sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
+                Blog
+              </Button>
+              <Button size='small' onClick={() => scrollTo('faq')}
+                sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
+                FAQ
+              </Button>
+            </Box>
+
+            {/* Right Actions */}
+            <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1.5 }, alignItems: 'center' }}>
+              <Button size='small' onClick={() => router.push('/login')}
+                sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600, textTransform: 'none', display: { xs: 'none', sm: 'inline-flex' } }}>
+                Sign In
+              </Button>
+              <Button variant='contained' size='small' disableElevation onClick={() => router.push('/register')}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, px: { xs: 2, sm: 3 }, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
+                Get Started
+              </Button>
+              {/* Mobile Menu Button */}
+              <IconButton aria-label='Open menu' onClick={() => setMobileOpen(true)} sx={{ display: { xs: 'flex', lg: 'none' }, color: '#fff', ml: 0.5 }}>
+                <i className='tabler-menu-2' style={{ fontSize: 22 }} />
+              </IconButton>
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+
+      {/* Mobile Drawer */}
+      <Drawer anchor='right' open={mobileOpen} onClose={() => setMobileOpen(false)}
+        PaperProps={{ sx: { bgcolor: '#0f0f1a', width: 300, p: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' } }}>
+        <Box sx={{ p: 2.5 }}>
+          {/* Drawer Header */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Logo />
+              <Typography variant='body1' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
+            </Box>
+            <IconButton aria-label='Close menu' onClick={() => setMobileOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+              <i className='tabler-x' style={{ fontSize: 20 }} />
+            </IconButton>
+          </Box>
+
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 2 }} />
+
+          {/* Mobile Menu Items */}
+          {navMenus.map(menu => (
+            <Box key={menu.label} sx={{ mb: 0.5 }}>
+              <Button fullWidth onClick={() => setMobileExpanded(mobileExpanded === menu.label ? null : menu.label)}
+                endIcon={<i className={mobileExpanded === menu.label ? 'tabler-chevron-up' : 'tabler-chevron-down'} style={{ fontSize: 14 }} />}
+                sx={{
+                  justifyContent: 'space-between', color: mobileExpanded === menu.label ? '#fff' : 'rgba(255,255,255,0.7)',
+                  textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2,
+                  bgcolor: mobileExpanded === menu.label ? 'rgba(115,103,240,0.08)' : 'transparent',
+                }}>
+                {menu.label}
+              </Button>
+              {mobileExpanded === menu.label && (
+                <Box sx={{ pl: 1, pb: 1 }}>
+                  {menu.items.map(item => (
+                    <Box key={item.title} onClick={() => { router.push(item.link); setMobileOpen(false) }}
+                      sx={{
+                        display: 'flex', gap: 1.5, p: 1.2, borderRadius: 2, cursor: 'pointer',
+                        transition: '0.15s', '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' },
+                      }}>
+                      <i className={item.icon} style={{ fontSize: 18, color: '#7367F0', marginTop: 2 }} />
+                      <Box>
+                        <Typography variant='body2' fontWeight={500} sx={{ color: '#fff', fontSize: '0.85rem' }}>{item.title}</Typography>
+                        <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem' }}>{item.desc}</Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          ))}
+
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
+
+          <Button fullWidth onClick={() => { router.push('/articles'); setMobileOpen(false) }}
+            sx={{ justifyContent: 'flex-start', color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2 }}>
+            <i className='tabler-article' style={{ fontSize: 18, marginRight: 10 }} /> Blog
+          </Button>
+          <Button fullWidth onClick={() => { scrollTo('faq'); setMobileOpen(false) }}
+            sx={{ justifyContent: 'flex-start', color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2 }}>
+            <i className='tabler-help-circle' style={{ fontSize: 18, marginRight: 10 }} /> FAQ
+          </Button>
+
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
+
+          <Button fullWidth variant='outlined' onClick={() => { router.push('/login'); setMobileOpen(false) }}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, mb: 1.5, color: '#fff', borderColor: 'rgba(255,255,255,0.15)', '&:hover': { borderColor: 'rgba(255,255,255,0.3)' } }}>
+            Sign In
+          </Button>
+          <Button fullWidth variant='contained' disableElevation onClick={() => { router.push('/register'); setMobileOpen(false) }}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
+            Get Started
+          </Button>
+        </Box>
+      </Drawer>
+    </>
+  )
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -343,222 +569,7 @@ const HomePage = () => {
       ` }} />
 
       {/* ════════════════════════ MEGA NAVBAR ════════════════════════ */}
-      {(() => {
-        const navMenus = [
-          {
-            label: 'Hosting', items: [
-              { icon: 'tabler-brand-wordpress', title: 'WordPress Hosting', desc: 'Managed WP with LiteSpeed & CyberPanel', link: '/hosting/plans' },
-              { icon: 'tabler-server', title: 'VPS Hosting', desc: 'Full root access, NVMe SSD, scalable', link: '/vps/order' },
-              { icon: 'tabler-server-cog', title: 'VDS Hosting', desc: 'Dedicated CPU & RAM, enterprise grade', link: '/vps/vds/order' },
-              { icon: 'tabler-database', title: 'Dedicated Server', desc: 'Bare metal, Intel Xeon, max performance', link: '/vps/dedicated/order' },
-            ]
-          },
-          {
-            label: 'Domains', items: [
-              { icon: 'tabler-world', title: 'Register Domain', desc: '.com, .np, .com.np from NPR 1,200', link: '/domains/search' },
-              { icon: 'tabler-transfer', title: 'Transfer Domain', desc: 'Move your domain with free extension', link: '/domains/transfers' },
-              { icon: 'tabler-dns', title: 'DNS Management', desc: 'Advanced DNS with full record support', link: '/domains/dns' },
-              { icon: 'tabler-shield-lock', title: 'WHOIS Privacy', desc: 'Protect your identity for free', link: '/domains' },
-            ]
-          },
-          {
-            label: 'Email', items: [
-              { icon: 'tabler-mail', title: 'Business Email', desc: 'Professional email with your domain', link: '/email' },
-              { icon: 'tabler-brand-google', title: 'Google Workspace', desc: 'Gmail, Drive, Meet for teams', link: '/email/google-workspace' },
-              { icon: 'tabler-mail-cog', title: 'Titan Email', desc: 'Built for business communication', link: '/email/titan' },
-            ]
-          },
-          {
-            label: 'Security', items: [
-              { icon: 'tabler-lock', title: 'SSL Certificates', desc: 'Free & premium SSL for every site', link: '/ssl' },
-              { icon: 'tabler-shield-check', title: 'DDoS Protection', desc: 'Always-on attack mitigation', link: '/vps' },
-              { icon: 'tabler-scan', title: 'Malware Scanner', desc: 'Auto-detect & remove threats', link: '/hosting/security/scanner' },
-            ]
-          },
-        ]
-
-        const [activeMenu, setActiveMenu] = useState<string | null>(null)
-        const [mobileOpen, setMobileOpen] = useState(false)
-        const [mobileExpanded, setMobileExpanded] = useState<string | null>(null)
-        const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-        const handleEnter = (label: string) => {
-          if (navTimeout.current) clearTimeout(navTimeout.current)
-          setActiveMenu(label)
-        }
-        const handleLeave = () => {
-          navTimeout.current = setTimeout(() => setActiveMenu(null), 200)
-        }
-
-        return (
-          <>
-            <Box sx={{
-              position: 'sticky', top: 0, zIndex: 1100,
-              bgcolor: 'rgba(15,15,26,0.92)', backdropFilter: 'blur(20px)',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <Container maxWidth='lg'>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 64 }}>
-                  {/* Logo */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', minWidth: 0 }} onClick={() => scrollTo('hero')}>
-                    <Logo />
-                    <Typography variant='h6' fontWeight={800} sx={{ color: '#fff', whiteSpace: 'nowrap' }}>Hosting Nepal</Typography>
-                  </Box>
-
-                  {/* Desktop Nav */}
-                  <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 0.5, alignItems: 'center' }}>
-                    {navMenus.map(menu => (
-                      <Box key={menu.label} onMouseEnter={() => handleEnter(menu.label)} onMouseLeave={handleLeave}
-                        sx={{ position: 'relative' }}>
-                        <Button size='small' endIcon={<i className='tabler-chevron-down' style={{ fontSize: 14, transition: '0.2s', transform: activeMenu === menu.label ? 'rotate(180deg)' : 'none' }} />}
-                          sx={{
-                            color: activeMenu === menu.label ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none',
-                            borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
-                          }}>
-                          {menu.label}
-                        </Button>
-
-                        {/* Dropdown Mega Menu */}
-                        <Box onMouseEnter={() => handleEnter(menu.label)} onMouseLeave={handleLeave}
-                          sx={{
-                            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-                            pt: 1, opacity: activeMenu === menu.label ? 1 : 0,
-                            pointerEvents: activeMenu === menu.label ? 'auto' : 'none',
-                            transition: 'opacity 0.2s ease, transform 0.2s ease',
-                          }}>
-                          <Paper elevation={0} sx={{
-                            bgcolor: 'rgba(20,20,38,0.98)', backdropFilter: 'blur(24px)',
-                            border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3,
-                            p: 1.5, minWidth: 320, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-                          }}>
-                            {menu.items.map(item => (
-                              <Box key={item.title} onClick={() => { router.push(item.link); setActiveMenu(null) }}
-                                sx={{
-                                  display: 'flex', gap: 2, p: 1.5, borderRadius: 2, cursor: 'pointer',
-                                  transition: '0.2s', '&:hover': { bgcolor: 'rgba(115,103,240,0.08)' },
-                                }}>
-                                <Box sx={{
-                                  width: 40, height: 40, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  bgcolor: 'rgba(115,103,240,0.1)', color: '#7367F0', flexShrink: 0,
-                                }}>
-                                  <i className={item.icon} style={{ fontSize: 20 }} />
-                                </Box>
-                                <Box>
-                                  <Typography variant='body2' fontWeight={600} sx={{ color: '#fff', lineHeight: 1.4 }}>{item.title}</Typography>
-                                  <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 }}>{item.desc}</Typography>
-                                </Box>
-                              </Box>
-                            ))}
-                          </Paper>
-                        </Box>
-                      </Box>
-                    ))}
-
-                    {/* Direct links */}
-                    <Button size='small' onClick={() => router.push('/articles')}
-                      sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
-                      Blog
-                    </Button>
-                    <Button size='small' onClick={() => scrollTo('faq')}
-                      sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500, textTransform: 'none', borderRadius: 2, px: 1.5, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' } }}>
-                      FAQ
-                    </Button>
-                  </Box>
-
-                  {/* Right Actions */}
-                  <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 1.5 }, alignItems: 'center' }}>
-                    <Button size='small' onClick={() => router.push('/login')}
-                      sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600, textTransform: 'none', display: { xs: 'none', sm: 'inline-flex' } }}>
-                      Sign In
-                    </Button>
-                    <Button variant='contained' size='small' disableElevation onClick={() => router.push('/register')}
-                      sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, px: { xs: 2, sm: 3 }, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
-                      Get Started
-                    </Button>
-                    {/* Mobile Menu Button */}
-                    <IconButton aria-label='Open menu' onClick={() => setMobileOpen(true)} sx={{ display: { xs: 'flex', lg: 'none' }, color: '#fff', ml: 0.5 }}>
-                      <i className='tabler-menu-2' style={{ fontSize: 22 }} />
-                    </IconButton>
-                  </Box>
-                </Box>
-              </Container>
-            </Box>
-
-            {/* Mobile Drawer */}
-            <Drawer anchor='right' open={mobileOpen} onClose={() => setMobileOpen(false)}
-              PaperProps={{ sx: { bgcolor: '#0f0f1a', width: 300, p: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' } }}>
-              <Box sx={{ p: 2.5 }}>
-                {/* Drawer Header */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Logo />
-                    <Typography variant='body1' fontWeight={800} sx={{ color: '#fff' }}>Hosting Nepal</Typography>
-                  </Box>
-                  <IconButton aria-label='Close menu' onClick={() => setMobileOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                    <i className='tabler-x' style={{ fontSize: 20 }} />
-                  </IconButton>
-                </Box>
-
-                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 2 }} />
-
-                {/* Mobile Menu Items */}
-                {navMenus.map(menu => (
-                  <Box key={menu.label} sx={{ mb: 0.5 }}>
-                    <Button fullWidth onClick={() => setMobileExpanded(mobileExpanded === menu.label ? null : menu.label)}
-                      endIcon={<i className={mobileExpanded === menu.label ? 'tabler-chevron-up' : 'tabler-chevron-down'} style={{ fontSize: 14 }} />}
-                      sx={{
-                        justifyContent: 'space-between', color: mobileExpanded === menu.label ? '#fff' : 'rgba(255,255,255,0.7)',
-                        textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2,
-                        bgcolor: mobileExpanded === menu.label ? 'rgba(115,103,240,0.08)' : 'transparent',
-                      }}>
-                      {menu.label}
-                    </Button>
-                    {mobileExpanded === menu.label && (
-                      <Box sx={{ pl: 1, pb: 1 }}>
-                        {menu.items.map(item => (
-                          <Box key={item.title} onClick={() => { router.push(item.link); setMobileOpen(false) }}
-                            sx={{
-                              display: 'flex', gap: 1.5, p: 1.2, borderRadius: 2, cursor: 'pointer',
-                              transition: '0.15s', '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' },
-                            }}>
-                            <i className={item.icon} style={{ fontSize: 18, color: '#7367F0', marginTop: 2 }} />
-                            <Box>
-                              <Typography variant='body2' fontWeight={500} sx={{ color: '#fff', fontSize: '0.85rem' }}>{item.title}</Typography>
-                              <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem' }}>{item.desc}</Typography>
-                            </Box>
-                          </Box>
-                        ))}
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-
-                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
-
-                <Button fullWidth onClick={() => { router.push('/articles'); setMobileOpen(false) }}
-                  sx={{ justifyContent: 'flex-start', color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2 }}>
-                  <i className='tabler-article' style={{ fontSize: 18, marginRight: 10 }} /> Blog
-                </Button>
-                <Button fullWidth onClick={() => { scrollTo('faq'); setMobileOpen(false) }}
-                  sx={{ justifyContent: 'flex-start', color: 'rgba(255,255,255,0.7)', textTransform: 'none', fontWeight: 600, py: 1.2, px: 1.5, borderRadius: 2 }}>
-                  <i className='tabler-help-circle' style={{ fontSize: 18, marginRight: 10 }} /> FAQ
-                </Button>
-
-                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 1.5 }} />
-
-                <Button fullWidth variant='outlined' onClick={() => { router.push('/login'); setMobileOpen(false) }}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, mb: 1.5, color: '#fff', borderColor: 'rgba(255,255,255,0.15)', '&:hover': { borderColor: 'rgba(255,255,255,0.3)' } }}>
-                  Sign In
-                </Button>
-                <Button fullWidth variant='contained' disableElevation onClick={() => { router.push('/register'); setMobileOpen(false) }}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, bgcolor: '#7367F0', '&:hover': { bgcolor: '#5E50EE' } }}>
-                  Get Started
-                </Button>
-              </Box>
-            </Drawer>
-          </>
-        )
-      })()}
+      <MegaNavbar scrollTo={scrollTo} />
 
       {/* ════════════════════════ HERO — Dark + Floating Pills ════════════════════════ */}
       <Box id='hero' className='hero-gradient' sx={{
@@ -1473,6 +1484,15 @@ const HomePage = () => {
               <Typography variant='body2' sx={{ color: '#fff', mb: 2, maxWidth: 280, lineHeight: 1.8 }}>
                 Nepal&apos;s trusted web hosting provider. Fast servers, local payments, and expert support.
               </Typography>
+              <Box sx={{ mb: 2.5, maxWidth: 300 }}>
+                <Typography variant='body2' sx={{ color: '#fff', lineHeight: 1.7 }}>
+                  A subsidiary of{' '}
+                  <Box component='span' sx={{ fontWeight: 700 }}>Marketminds Investment Group Pvt. Ltd.</Box>
+                </Typography>
+                <Typography variant='caption' sx={{ color: 'rgba(255,255,255,0.45)', display: 'block', mt: 0.75, lineHeight: 1.6 }}>
+                  Registered with the Government of Nepal, Office of the Company Registrar — Company Reg. No. 350091/81/82, incorporated 25 July 2024.
+                </Typography>
+              </Box>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {['tabler-brand-facebook', 'tabler-brand-twitter', 'tabler-brand-instagram'].map(icon => (
                   <IconButton key={icon} aria-label={icon.replace('tabler-brand-', '')} size='small' sx={{ color: '#fff', '&:hover': { color: '#28C76F' } }}>
@@ -1527,7 +1547,7 @@ const HomePage = () => {
           </Grid>
           <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
           <Typography variant='body2' sx={{ color: '#fff', textAlign: 'center' }}>
-            {new Date().getFullYear()} &copy; Marketminds Investment Group. All rights reserved.
+            {new Date().getFullYear()} &copy; Hosting Nepal — a subsidiary of Marketminds Investment Group Pvt. Ltd. All rights reserved.
           </Typography>
         </Container>
       </Box>

@@ -96,7 +96,7 @@ const DockerManagementPage = () => {
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const list = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
         const vpsList = (Array.isArray(list) ? list : []).filter(
-          (h: any) => h.type === 'VPS' || h.type === 'vps' || h.type === 'VDS' || h.type === 'vds'
+          (h: any) => h.planType === 'VPS' || h.planType === 'DEDICATED' || h.planType === 'CLOUD'
         )
         setServers(vpsList)
       } catch {

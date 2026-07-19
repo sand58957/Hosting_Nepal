@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from '../../database/database.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
@@ -16,7 +15,8 @@ import { BILLING_QUEUES } from './billing.constants';
   imports: [
     ConfigModule,
     DatabaseModule,
-    EventEmitterModule.forRoot(),
+    // EventEmitterModule.forRoot() must only be called once (AppModule) — a second
+    // forRoot here registered a competing global EventEmitter2 instance.
     BullModule.registerQueue(
       { name: BILLING_QUEUES.PAYMENT },
       { name: BILLING_QUEUES.INVOICE },

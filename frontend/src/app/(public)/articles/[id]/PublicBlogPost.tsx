@@ -48,7 +48,10 @@ function renderMarkdown(md: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+      const safeUrl = /^https?:\/\//i.test(url.trim()) ? url.trim() : '#'
+      return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`
+    })
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/\n\n/g, '</p><p>')
 
@@ -321,7 +324,7 @@ const PublicBlogPost = ({ slug, initialPost = null }: { slug: string; initialPos
               onClick={() => post.author.authorSlug && router.push(`/authors/${post.author.authorSlug}`)}
             >
               <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 44, height: 44, bgcolor: c.brand, fontSize: 16, fontWeight: 700 }}>
-                {post.author.name.charAt(0)}
+                {post.author?.name?.charAt(0) || 'A'}
               </Avatar>
               <Box>
                 <Typography variant='body2' sx={{ color: c.text, fontWeight: 600 }}>
@@ -431,7 +434,7 @@ const PublicBlogPost = ({ slug, initialPost = null }: { slug: string; initialPos
             <Card elevation={0} sx={{ mt: 5, bgcolor: c.surface, border: `1px solid ${c.border}`, borderRadius: 3, maxWidth: '68ch' }}>
               <CardContent sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, p: 3, flexWrap: 'wrap' }}>
                 <Avatar src={post.author.avatarUrl || undefined} sx={{ width: 64, height: 64, bgcolor: c.brand, fontSize: 24, fontWeight: 700 }}>
-                  {post.author.name.charAt(0)}
+                  {post.author?.name?.charAt(0) || 'A'}
                 </Avatar>
                 <Box sx={{ flex: 1, minWidth: 240 }}>
                   <Typography variant='overline' sx={{ color: c.textSubtle, letterSpacing: 1.5 }}>Written by</Typography>

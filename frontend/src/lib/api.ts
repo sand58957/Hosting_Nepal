@@ -39,6 +39,9 @@ api.interceptors.response.use(
 
       if (!isAuthEndpoint) {
         localStorage.removeItem('hosting-nepal-auth')
+        // Also clear Zustand store state to match localStorage
+        const { useAuthStore } = await import('@/store/auth.store')
+        useAuthStore.getState().logout()
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login'
         }

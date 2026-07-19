@@ -10,6 +10,7 @@ import VerticalLayout from '@layouts/VerticalLayout'
 import HorizontalLayout from '@layouts/HorizontalLayout'
 
 // Component Imports
+import AuthGuard from '@components/AuthGuard'
 import Providers from '@components/Providers'
 import Navigation from '@components/layout/vertical/Navigation'
 import Header from '@components/layout/horizontal/Header'
@@ -33,6 +34,7 @@ const Layout = async (props: ChildrenType) => {
 
   return (
     <Providers direction={direction}>
+      <AuthGuard>
       <LayoutWrapper
         systemMode={systemMode}
         verticalLayout={
@@ -51,6 +53,7 @@ const Layout = async (props: ChildrenType) => {
           <i className='tabler-arrow-up' />
         </Button>
       </ScrollToTop>
+      </AuthGuard>
     </Providers>
   )
 }

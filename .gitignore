@@ -8,3 +8,5 @@ dist/
 frontend-old/
 vuexy-admin-v10.11.1/
 backend/.env.production
+backend/.env.production*
+.env.production*

@@ -117,7 +117,7 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
 
     try {
       const response = await api.post('/auth/login', { email: emailValue, password })
-      const data = response.data.data
+      const data = response.data?.data ?? response.data
 
       if (data?.user && data?.accessToken) {
         login(data.user, data.accessToken, data.refreshToken)

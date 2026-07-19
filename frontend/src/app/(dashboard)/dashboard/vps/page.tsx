@@ -31,6 +31,7 @@ interface VPSServer {
   ip?: string
   status: string
   plan: string
+  planName?: string
   planType?: string
   vcpu?: number
   ram?: number
@@ -43,6 +44,64 @@ interface VPSServer {
   diskUsage?: number
   bandwidth?: number
   createdAt?: string
+}
+
+interface RecentAction {
+  id: string
+  action: string
+  hostname: string | null
+  createdAt: string
+}
+
+const ACTION_META: Record<string, { label: string; icon: string; color: string }> = {
+  VPS_START: { label: 'Server Started', icon: 'tabler-player-play', color: 'success.main' },
+  VPS_STOP: { label: 'Server Stopped', icon: 'tabler-player-stop', color: 'error.main' },
+  VPS_RESTART: { label: 'Server Restarted', icon: 'tabler-refresh', color: 'warning.main' },
+  VPS_REINSTALL: { label: 'OS Reinstalled', icon: 'tabler-download', color: 'primary.main' },
+  VPS_SNAPSHOT_CREATE: { label: 'Snapshot Created', icon: 'tabler-camera', color: 'info.main' },
+  VPS_SNAPSHOT_RESTORE: { label: 'Snapshot Restored', icon: 'tabler-history', color: 'info.main' },
+  VPS_SNAPSHOT_DELETE: { label: 'Snapshot Deleted', icon: 'tabler-trash', color: 'error.main' },
+  VPS_PASSWORD_RESET: { label: 'Password Reset', icon: 'tabler-key', color: 'warning.main' },
+  VPS_UPGRADE_REQUEST: { label: 'Upgrade Requested', icon: 'tabler-arrow-big-up', color: 'primary.main' },
+  VPS_UPGRADE: { label: 'Plan Upgraded', icon: 'tabler-arrow-big-up', color: 'success.main' },
+  VPS_REQUESTED: { label: 'VPS Ordered', icon: 'tabler-shopping-cart', color: 'primary.main' },
+  VPS_APPROVED: { label: 'VPS Approved', icon: 'tabler-circle-check', color: 'success.main' },
+  VPS_REJECTED: { label: 'VPS Rejected', icon: 'tabler-circle-x', color: 'error.main' },
+}
+
+const actionMeta = (action: string) =>
+  ACTION_META[action] ?? {
+    label: action
+      .replace(/^VPS_/, '')
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase()),
+    icon: 'tabler-activity',
+    color: 'primary.main',
+  }
+
+const timeAgo = (iso: string): string => {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+
+  if (minutes < 60) return `${minutes} min${minutes > 1 ? 's' : ''} ago`
+  const hours = Math.floor(minutes / 60)
+
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+  const days = Math.floor(hours / 24)
+
+  if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+
+  return new Date(iso).toLocaleDateString()
+}
+
+// Average of only the servers that actually report a value — no fabricated numbers.
+const realAvg = (values: Array<number | undefined>): number | null => {
+  const nums = values.filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
+
+  return nums.length > 0 ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null
 }
 
 const statusColorMap: Record<string, 'success' | 'warning' | 'error' | 'info' | 'default'> = {
@@ -59,12 +118,18 @@ const statusColorMap: Record<string, 'success' | 'warning' | 'error' | 'info' | 
 const VPSDashboardPage = () => {
   const router = useRouter()
   const [servers, setServers] = useState<VPSServer[]>([])
+  const [recentActions, setRecentActions] = useState<RecentAction[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const res = await api.get('/hosting')
+      const [serversRes, activityRes] = await Promise.allSettled([
+        api.get('/hosting'),
+        api.get('/hosting/vps-activity'),
+      ])
+
+      if (serversRes.status === 'fulfilled') {
+        const res = serversRes.value
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
         const all = Array.isArray(raw) ? raw : raw?.services ? raw.services : []
 
@@ -75,11 +140,18 @@ const VPSDashboardPage = () => {
         )
 
         setServers(vpsOnly)
-      } catch {
-        // silently handle
-      } finally {
-        setLoading(false)
+      } else if (serversRes.status === 'rejected') {
+        console.error('Failed to fetch servers:', serversRes.reason)
       }
+
+      if (activityRes.status === 'fulfilled') {
+        const res = activityRes.value
+        const raw = res.data?.data?.data ?? res.data?.data ?? res.data
+
+        setRecentActions(Array.isArray(raw) ? raw : [])
+      }
+
+      setLoading(false)
     }
 
     fetchData()
@@ -90,15 +162,10 @@ const VPSDashboardPage = () => {
   const stoppedServers = servers.filter(s => ['STOPPED', 'stopped'].includes(s.status)).length
   const totalMonthlyCost = servers.reduce((sum, s) => sum + (s.monthlyCost ?? s.price ?? 0), 0)
 
-  const avgCpu = servers.length > 0
-    ? Math.round(servers.reduce((sum, s) => sum + (s.cpuUsage ?? Math.random() * 60 + 10), 0) / servers.length)
-    : 0
-  const avgRam = servers.length > 0
-    ? Math.round(servers.reduce((sum, s) => sum + (s.ramUsage ?? Math.random() * 50 + 20), 0) / servers.length)
-    : 0
-  const avgDisk = servers.length > 0
-    ? Math.round(servers.reduce((sum, s) => sum + (s.diskUsage ?? Math.random() * 40 + 15), 0) / servers.length)
-    : 0
+  // null = no server reports this metric → render N/A instead of a made-up number
+  const avgCpu = realAvg(servers.map(s => s.cpuUsage))
+  const avgRam = realAvg(servers.map(s => s.ramUsage))
+  const avgDisk = realAvg(servers.map(s => s.diskUsage))
   const totalBandwidth = servers.reduce((sum, s) => sum + (s.bandwidth ?? 0), 0)
 
   // Region distribution
@@ -112,21 +179,10 @@ const VPSDashboardPage = () => {
   // Plan distribution
   const planCounts: Record<string, number> = {}
   servers.forEach(s => {
-    const plan = s.plan || 'Unknown'
+    const plan = s.plan || s.planName || 'Unknown'
     planCounts[plan] = (planCounts[plan] || 0) + 1
   })
   const maxPlanCount = Math.max(...Object.values(planCounts), 1)
-
-  // Mock recent actions
-  const recentActions = [
-    { action: 'Server Started', hostname: servers[0]?.hostname ?? 'vps-node-1', time: '1 hour ago', icon: 'tabler-player-play', color: 'success.main' },
-    { action: 'Snapshot Created', hostname: servers[0]?.hostname ?? 'vps-node-1', time: '3 hours ago', icon: 'tabler-camera', color: 'info.main' },
-    { action: 'Server Stopped', hostname: servers[1]?.hostname ?? 'vps-node-2', time: '6 hours ago', icon: 'tabler-player-stop', color: 'error.main' },
-    { action: 'Server Restarted', hostname: servers[0]?.hostname ?? 'vps-node-1', time: '1 day ago', icon: 'tabler-refresh', color: 'warning.main' },
-    { action: 'OS Reinstalled', hostname: servers[2]?.hostname ?? 'vps-node-3', time: '2 days ago', icon: 'tabler-download', color: 'primary.main' },
-    { action: 'Server Started', hostname: servers[1]?.hostname ?? 'vps-node-2', time: '3 days ago', icon: 'tabler-player-play', color: 'success.main' },
-    { action: 'Snapshot Deleted', hostname: servers[0]?.hostname ?? 'vps-node-1', time: '4 days ago', icon: 'tabler-trash', color: 'error.main' },
-  ]
 
   const statCards = [
     { label: 'Total VPS Servers', value: totalServers, icon: 'tabler-server', color: 'primary.main' },
@@ -259,37 +315,37 @@ const VPSDashboardPage = () => {
             <Box sx={{ mb: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                 <Typography variant='body2'>CPU Usage</Typography>
-                <Typography variant='body2' fontWeight={600}>{avgCpu}%</Typography>
+                <Typography variant='body2' fontWeight={600}>{avgCpu !== null ? `${avgCpu}%` : 'N/A'}</Typography>
               </Box>
               <LinearProgress
                 variant='determinate'
-                value={avgCpu}
+                value={avgCpu ?? 0}
                 sx={{ height: 8, borderRadius: 4 }}
-                color={avgCpu > 80 ? 'error' : avgCpu > 60 ? 'warning' : 'primary'}
+                color={(avgCpu ?? 0) > 80 ? 'error' : (avgCpu ?? 0) > 60 ? 'warning' : 'primary'}
               />
             </Box>
             <Box sx={{ mb: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                 <Typography variant='body2'>RAM Usage</Typography>
-                <Typography variant='body2' fontWeight={600}>{avgRam}%</Typography>
+                <Typography variant='body2' fontWeight={600}>{avgRam !== null ? `${avgRam}%` : 'N/A'}</Typography>
               </Box>
               <LinearProgress
                 variant='determinate'
-                value={avgRam}
+                value={avgRam ?? 0}
                 sx={{ height: 8, borderRadius: 4 }}
-                color={avgRam > 80 ? 'error' : avgRam > 60 ? 'warning' : 'info'}
+                color={(avgRam ?? 0) > 80 ? 'error' : (avgRam ?? 0) > 60 ? 'warning' : 'info'}
               />
             </Box>
             <Box sx={{ mb: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                 <Typography variant='body2'>Disk Usage</Typography>
-                <Typography variant='body2' fontWeight={600}>{avgDisk}%</Typography>
+                <Typography variant='body2' fontWeight={600}>{avgDisk !== null ? `${avgDisk}%` : 'N/A'}</Typography>
               </Box>
               <LinearProgress
                 variant='determinate'
-                value={avgDisk}
+                value={avgDisk ?? 0}
                 sx={{ height: 8, borderRadius: 4 }}
-                color={avgDisk > 80 ? 'error' : avgDisk > 60 ? 'warning' : 'success'}
+                color={(avgDisk ?? 0) > 80 ? 'error' : (avgDisk ?? 0) > 60 ? 'warning' : 'success'}
               />
             </Box>
             <Box>
@@ -353,28 +409,47 @@ const VPSDashboardPage = () => {
         <Card>
           <CardHeader title='Recent Actions' />
           <CardContent>
-            {recentActions.map((action, idx) => (
-              <Box
-                key={idx}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  py: 1.5,
-                  borderBottom: idx < recentActions.length - 1 ? '1px solid' : 'none',
-                  borderColor: 'divider',
-                }}
-              >
-                <Avatar sx={{ bgcolor: action.color, width: 36, height: 36 }}>
-                  <i className={action.icon} style={{ fontSize: 18, color: '#fff' }} />
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant='body2' fontWeight={600}>{action.action}</Typography>
-                  <Typography variant='caption' color='text.secondary'>{action.hostname}</Typography>
-                </Box>
-                <Typography variant='caption' color='text.secondary'>{action.time}</Typography>
+            {loading ? (
+              <Box>
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} height={48} sx={{ mb: 1 }} />
+                ))}
               </Box>
-            ))}
+            ) : recentActions.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <i className='tabler-activity' style={{ fontSize: 40, color: '#aaa' }} />
+                <Typography variant='body2' color='text.secondary' sx={{ mt: 2 }}>
+                  No actions yet. Start, stop, or snapshot a server and it will show up here.
+                </Typography>
+              </Box>
+            ) : (
+              recentActions.map((entry, idx) => {
+                const meta = actionMeta(entry.action)
+
+                return (
+                  <Box
+                    key={entry.id}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      py: 1.5,
+                      borderBottom: idx < recentActions.length - 1 ? '1px solid' : 'none',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Avatar sx={{ bgcolor: meta.color, width: 36, height: 36 }}>
+                      <i className={meta.icon} style={{ fontSize: 18, color: '#fff' }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant='body2' fontWeight={600}>{meta.label}</Typography>
+                      <Typography variant='caption' color='text.secondary'>{entry.hostname ?? '—'}</Typography>
+                    </Box>
+                    <Typography variant='caption' color='text.secondary'>{timeAgo(entry.createdAt)}</Typography>
+                  </Box>
+                )
+              })
+            )}
           </CardContent>
         </Card>
       </Grid>

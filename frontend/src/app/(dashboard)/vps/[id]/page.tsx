@@ -59,6 +59,7 @@ interface VPSDetail {
   disk: number
   createdAt: string
   terminationDate: string
+  expiryDate?: string
   contractPeriod: string
   monthlyPrice: number
   vncEnabled: boolean
@@ -74,6 +75,14 @@ interface VPSDetail {
   diskUsage: number
   bandwidth: number
   uptime: string
+  // Live provider (Contabo) fields, merged from vmStatus
+  macAddress?: string
+  productName?: string
+  productId?: string
+  liveStatus?: string
+  dataCenter?: string
+  osLabel?: string
+  monthlyPriceNpr?: number
 }
 
 interface Snapshot {
@@ -128,15 +137,35 @@ interface BackupItem {
 // Constants
 // ---------------------------------------------------------------------------
 
+// Fallback OS list (legacy slugs the backend maps) — replaced at runtime by the
+// FULL live Contabo image catalog from GET /hosting/vps-images.
 const osOptions = [
-  { label: 'Ubuntu 22.04 LTS', value: 'ubuntu-22.04', icon: 'tabler-brand-ubuntu' },
   { label: 'Ubuntu 24.04 LTS', value: 'ubuntu-24.04', icon: 'tabler-brand-ubuntu' },
+  { label: 'Ubuntu 22.04 LTS', value: 'ubuntu-22.04', icon: 'tabler-brand-ubuntu' },
   { label: 'Debian 12', value: 'debian-12', icon: 'tabler-brand-debian' },
-  { label: 'CentOS 9 Stream', value: 'centos-9', icon: 'tabler-brand-centos' },
+  { label: 'Debian 11', value: 'debian-11', icon: 'tabler-brand-debian' },
   { label: 'AlmaLinux 9', value: 'almalinux-9', icon: 'tabler-server' },
   { label: 'Rocky Linux 9', value: 'rocky-9', icon: 'tabler-server' },
-  { label: 'Windows Server 2022', value: 'windows-2022', icon: 'tabler-brand-windows' },
-  { label: 'Fedora 39', value: 'fedora-39', icon: 'tabler-brand-redhat' },
+  { label: 'CentOS 9 Stream', value: 'centos-9', icon: 'tabler-brand-centos' },
+]
+
+const osIconFor = (name: string, osType?: string): string => {
+  const n = name.toLowerCase()
+  if (n.includes('ubuntu')) return 'tabler-brand-ubuntu'
+  if (n.includes('debian')) return 'tabler-brand-debian'
+  if (n.includes('centos')) return 'tabler-brand-centos'
+  if (n.includes('fedora') || n.includes('redhat')) return 'tabler-brand-redhat'
+  if (osType === 'Windows' || n.includes('windows')) return 'tabler-brand-windows'
+  return 'tabler-server'
+}
+
+const stackOptions = [
+  { value: 'none', label: 'None (plain OS)' },
+  { value: 'docker', label: 'Docker + Docker Compose' },
+  { value: 'docker-portainer', label: 'Docker + Portainer (Web UI)' },
+  { value: 'k3s', label: 'k3s (Lightweight Kubernetes)' },
+  { value: 'k3s-portainer', label: 'k3s + Portainer' },
+  { value: 'full-stack', label: 'Full Stack (Docker + k3s + Portainer)' },
 ]
 
 const licenseOptions = [
@@ -179,6 +208,27 @@ const VPSDetailPage = () => {
   const [reinstallDialogOpen, setReinstallDialogOpen] = useState(false)
   const [selectedOs, setSelectedOs] = useState('')
   const [reinstallConfirm, setReinstallConfirm] = useState(false)
+  const [reinstallStack, setReinstallStack] = useState('none')
+  const [reinstallPassword, setReinstallPassword] = useState('')
+  // Full live Contabo image catalog (falls back to the static slugs)
+  const [osImages, setOsImages] = useState(osOptions)
+  useEffect(() => {
+    api.get('/hosting/vps-images')
+      .then((res) => {
+        const raw = res.data?.data ?? res.data
+        const list = Array.isArray(raw) ? raw : []
+        if (list.length > 0) {
+          setOsImages(
+            list.map((i: any) => ({
+              value: i.imageId,
+              label: i.name,
+              icon: osIconFor(String(i.name || ''), i.osType),
+            })),
+          )
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Reset password dialog
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
@@ -248,7 +298,39 @@ const VPSDetailPage = () => {
   const fetchServer = useCallback(async () => {
     try {
       const res = await api.get(`/hosting/vps/${serverId}`)
-      const raw = unwrap(res)
+      let raw = unwrap(res)
+
+      // Merge live Contabo data into the flat fields this page renders, so the
+      // detail view mirrors the Contabo panel (IP, IPv6, MAC, host system,
+      // default user, dates, plan). vmStatus is the raw Contabo response
+      // envelope: { data: [instance], _links } — unwrap it first.
+      const vmEnv = raw?.vmStatus
+      const vm = Array.isArray(vmEnv?.data) ? vmEnv.data[0] : vmEnv
+      if (vm && (vm.instanceId || vm.macAddress)) {
+        raw = {
+          ...raw,
+          displayName: vm.displayName || raw.displayName || raw.planName,
+          hostSystem: vm.vHostNumber ? String(vm.vHostNumber) : raw.hostSystem,
+          region: vm.regionName || vm.region || raw.region,
+          dataCenter: vm.dataCenter,
+          ipAddress: vm.ipConfig?.v4?.ip || raw.ipAddress,
+          ipv6Address: vm.ipConfig?.v6?.ip || raw.ipv6Address,
+          macAddress: vm.macAddress,
+          os: raw.osLabel || vm.osType || raw.os,
+          createdAt: vm.createdDate || raw.createdAt,
+          terminationDate: vm.cancelDate || raw.terminationDate,
+          defaultUser: vm.defaultUser || raw.defaultUser,
+          productName: vm.productName,
+          productId: vm.productId,
+          cpu: vm.cpuCores ?? raw.cpu,
+          ram: vm.ramMb ? Math.round(vm.ramMb / 1024) : raw.ram,
+          disk: vm.diskMb ? Math.round(vm.diskMb / 1024) : raw.disk,
+          monthlyPrice: raw.monthlyPriceNpr ?? raw.monthlyPrice,
+          liveStatus: vm.status,
+          status: vm.status ? String(vm.status).toUpperCase() : raw.status,
+        }
+      }
+
       setServer(raw)
       setNewDisplayName(raw?.displayName || raw?.hostname || '')
       setSelectedOs(raw?.os || '')
@@ -371,13 +453,20 @@ const VPSDetailPage = () => {
     if (!selectedOs || !reinstallConfirm) return
     setActionLoading('reinstall')
     try {
-      await api.post(`/hosting/vps/${serverId}/reinstall`, { os: selectedOs })
+      await api.post(`/hosting/vps/${serverId}/reinstall`, {
+        osTemplate: selectedOs,
+        containerStack: reinstallStack !== 'none' ? reinstallStack : undefined,
+        rootPassword: reinstallPassword || undefined,
+      })
       setReinstallDialogOpen(false)
       setReinstallConfirm(false)
+      setReinstallPassword('')
+      setReinstallStack('none')
       showSuccess('OS reinstallation started. This may take a few minutes.')
       await fetchServer()
-    } catch {
-      showError('Failed to reinstall OS.')
+    } catch (e: any) {
+      const msg = e?.response?.data?.message
+      showError(Array.isArray(msg) ? msg.join(', ') : msg || 'Failed to reinstall OS.')
     } finally {
       setActionLoading(null)
     }
@@ -388,7 +477,7 @@ const VPSDetailPage = () => {
     if (!newPassword || newPassword !== confirmPassword) return
     setActionLoading('password')
     try {
-      await api.post(`/hosting/vps/${serverId}/password`, { password: newPassword })
+      await api.post(`/hosting/vps/${serverId}/password`, { newPassword })
       setPasswordDialogOpen(false)
       setNewPassword('')
       setConfirmPassword('')
@@ -421,7 +510,7 @@ const VPSDetailPage = () => {
     setActionLoading('rescue')
     const enable = !server?.rescueMode
     try {
-      await api.post(`/hosting/vps/${serverId}/rescue`, { enable })
+      await api.post(`/hosting/vps/${serverId}/rescue`, { enabled: enable })
       setRescueDialogOpen(false)
       showSuccess(enable ? 'Rescue mode enabled.' : 'Rescue mode disabled.')
       await fetchServer()
@@ -675,7 +764,7 @@ const VPSDetailPage = () => {
         ) : (
           <Typography
             variant='body1'
-            sx={mono ? { fontFamily: 'monospace', fontSize: '0.875rem' } : undefined}
+            sx={mono ? { fontFamily: 'monospace', fontSize: '0.875rem', wordBreak: 'break-all', pr: 2 } : { wordBreak: 'break-word' }}
           >
             {value || 'N/A'}
           </Typography>
@@ -879,11 +968,11 @@ const VPSDetailPage = () => {
               <InfoField label='IPv6 Address' value={server.ipv6Address || 'Not assigned'} mono />
               <InfoField label='OS' value={server.os || 'N/A'} />
               <InfoField label='Creation Date' value={formatDate(server.createdAt)} />
-              <InfoField label='Termination Date' value={formatDate(server.terminationDate)} />
+              <InfoField label='Expiry Date' value={formatDate(server.expiryDate || server.terminationDate)} />
 
               {/* Row 3 */}
               <InfoField label='Contract Period' value={server.contractPeriod || 'Monthly'} />
-              <InfoField label='Monthly Price' value={formatPrice(server.monthlyPrice)} />
+              <InfoField label='Monthly Price' value={formatPrice(server.monthlyPrice ?? server.monthlyPriceNpr)} />
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
                   VNC
@@ -901,7 +990,13 @@ const VPSDetailPage = () => {
               </Grid>
               <InfoField label='Default User' value={server.defaultUser || 'root'} />
 
-              {/* Row 4 */}
+              {/* Row 4 — live provider details */}
+              <InfoField label='MAC Address' value={server.macAddress || 'N/A'} mono />
+              <InfoField
+                label='Plan'
+                value={server.productName || server.planName || 'N/A'}
+              />
+              <InfoField label='Datacenter' value={server.dataCenter || server.region || 'N/A'} />
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
                   Applications
@@ -925,6 +1020,50 @@ const VPSDetailPage = () => {
                   Disk
                 </Typography>
                 <Typography variant='body1'>{server.disk || 0} GB SSD</Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* SERVER ACCESS (SSH)                                                */}
+      {/* ----------------------------------------------------------------- */}
+      <Grid size={{ xs: 12 }}>
+        <Card>
+          <CardContent>
+            <Typography variant='h6' sx={{ mb: 2 }}>
+              <i className='tabler-terminal-2' style={{ fontSize: 20, marginRight: 8, verticalAlign: 'text-bottom' }} />
+              Server Access
+            </Typography>
+            <Grid container spacing={4}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
+                  SSH Command
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant='body2' sx={{ fontFamily: 'monospace', bgcolor: 'action.hover', px: 1.5, py: 0.75, borderRadius: 1 }}>
+                    ssh {server.defaultUser || 'root'}@{server.ipAddress || '<ip>'}
+                  </Typography>
+                  <Tooltip title='Copy'>
+                    <IconButton size='small' onClick={() => navigator.clipboard?.writeText(`ssh ${server.defaultUser || 'root'}@${server.ipAddress || ''}`)}>
+                      <i className='tabler-copy' style={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mt: 1 }}>
+                  Log in with the SSH key or root password you provided when ordering. Don’t have an SSH key?
+                  Generate one on your computer with <code>ssh-keygen -t ed25519</code> — the public key is in <code>~/.ssh/id_ed25519.pub</code>.
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 0.5 }}>
+                  Console (VNC)
+                </Typography>
+                <Typography variant='body2'>
+                  Browser console access is provided by the datacenter panel. If you can’t log in via SSH,
+                  use <strong>Reinstall</strong> (set a new password / key) or contact support to reset credentials.
+                </Typography>
               </Grid>
             </Grid>
           </CardContent>
@@ -1705,12 +1844,12 @@ const VPSDetailPage = () => {
             </Alert>
             <CustomTextField
               select
-              label='Select Operating System'
+              label={`Select Operating System (${osImages.length} available)`}
               value={selectedOs}
               onChange={(e) => setSelectedOs(e.target.value)}
               fullWidth
             >
-              {osOptions.map((os) => (
+              {osImages.map((os) => (
                 <MenuItem key={os.value} value={os.value}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <i className={os.icon} style={{ fontSize: 16 }} />
@@ -1719,6 +1858,26 @@ const VPSDetailPage = () => {
                 </MenuItem>
               ))}
             </CustomTextField>
+            <CustomTextField
+              select
+              label='Container Stack (Optional)'
+              value={reinstallStack}
+              onChange={(e) => setReinstallStack(e.target.value)}
+              fullWidth
+              helperText='Pre-install Docker, Kubernetes, or Portainer during reinstall (Linux images only)'
+            >
+              {stackOptions.map((s) => (
+                <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+              ))}
+            </CustomTextField>
+            <CustomTextField
+              label='New Root Password (Optional)'
+              type='password'
+              value={reinstallPassword}
+              onChange={(e) => setReinstallPassword(e.target.value)}
+              fullWidth
+              helperText='Set a fresh root password during reinstall — useful if you lost access'
+            />
             <FormControlLabel
               control={
                 <Switch

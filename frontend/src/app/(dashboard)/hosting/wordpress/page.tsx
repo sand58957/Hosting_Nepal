@@ -67,9 +67,23 @@ const WordPressPage = () => {
       setWebsites(Array.isArray(raw) ? raw : [])
     } catch {
       try {
+        // Fallback: /hosting returns raw HostingAccount rows, not the transformed
+        // Website shape — map them so the table, wpSites filter and install dialog
+        // all read the right fields (mirrors hosting/page.tsx).
         const res = await api.get('/hosting')
         const raw = res.data?.data?.data ?? res.data?.data ?? res.data
-        setWebsites(Array.isArray(raw) ? raw : [])
+        const accounts = Array.isArray(raw) ? raw : raw?.hostings ?? raw?.data ?? []
+        setWebsites(
+          (Array.isArray(accounts) ? accounts : []).map((a: any) => ({
+            id: a.id,
+            domain: a.domain?.domainName || a.cpanelUsername || 'N/A',
+            planName: a.planName,
+            planType: a.planType,
+            status: a.status,
+            hasWordPress: a.planType === 'WORDPRESS' || !!a.hasWordPress,
+            wordPressSites: a.wordPressSites || [],
+          }))
+        )
       } catch {
         // silently handle
       }

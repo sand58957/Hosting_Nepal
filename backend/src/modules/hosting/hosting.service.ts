@@ -4,12 +4,14 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { HostingStatus, HostingProvider, HostingPlanType } from '@prisma/client';
+import { HostingStatus, HostingProvider, HostingPlanType, BillingCycle } from '@prisma/client';
+import { BILLING_CYCLE_MONTHS, BILLING_CYCLE_LABEL, computeExpiry } from './hosting-billing.util';
 import { PrismaService } from '../../database/prisma.service';
 import { CyberPanelService } from './services/cyberpanel.service';
 import { ProxmoxService } from './services/proxmox.service';
@@ -39,45 +41,54 @@ import {
 const USD_TO_NPR = 133;
 const DEDICATED_MARGIN_PERCENT = 50; // 50% margin for Dedicated (ResellerClub)
 
-// EUR to NPR conversion (for Contabo)
-const EUR_TO_NPR = 148;
-const VPS_VDS_MARGIN_PERCENT = 100; // 100% margin for VPS/VDS (Contabo)
-
 // Apply 50% margin and convert USD to NPR (for ResellerClub Dedicated)
 function applyMargin(usd: number): number {
   return Math.ceil(usd * USD_TO_NPR * (1 + DEDICATED_MARGIN_PERCENT / 100));
 }
 
-// Apply 100% margin and convert EUR to NPR (for Contabo VPS/VDS)
-function applyMarginEur(eur: number): number {
-  return Math.ceil(eur * EUR_TO_NPR * (1 + VPS_VDS_MARGIN_PERCENT / 100));
+// Contabo Cloud VPS / Storage VPS / VDS retail pricing: take Contabo's live USD
+// list price (GET /v1/products), add a 50% markup, convert USD→NPR at 155.
+//   NPR = ceil(usd * 155 * 1.5)
+const CONTABO_USD_TO_NPR = 155;
+const CONTABO_VPS_MARGIN_PERCENT = 50;
+const CONTABO_TERM_FACTOR = 0.8; // Contabo 12-month term = 20% off the API list price
+function applyContaboUsd(listUsd: number): number {
+  return Math.ceil(listUsd * CONTABO_TERM_FACTOR * CONTABO_USD_TO_NPR * (1 + CONTABO_VPS_MARGIN_PERCENT / 100));
 }
 
 // Contabo product ID mapping for VPS/VDS plans
 const CONTABO_PRODUCT_MAP: Record<string, { contaboProductId: string; name: string }> = {
-  'vps-10': { contaboProductId: 'V45', name: 'VPS 10' },
-  'vps-20': { contaboProductId: 'V46', name: 'VPS 20' },
-  'vps-30': { contaboProductId: 'V47', name: 'VPS 30' },
-  'vps-40': { contaboProductId: 'V48', name: 'VPS 40' },
-  'vps-50': { contaboProductId: 'V49', name: 'VPS 50' },
-  'vps-60': { contaboProductId: 'V50', name: 'VPS 60' },
-  'vds-s': { contaboProductId: 'V90', name: 'VDS S' },
-  'vds-m': { contaboProductId: 'V91', name: 'VDS M' },
-  'vds-l': { contaboProductId: 'V92', name: 'VDS L' },
-  'vds-xl': { contaboProductId: 'V93', name: 'VDS XL' },
-  'vds-xxl': { contaboProductId: 'V94', name: 'VDS XXL' },
+  // HN plan id -> real Contabo product id (SSD variant, from GET /v1/products).
+  // Cloud VPS 10-60 = V92/V95/V98/V101/V104/V107; Cloud VDS S–XXL = V8/V9/V10/V11/V16.
+  'vps-10': { contaboProductId: 'V92', name: 'VPS 10' }, // Cloud VPS 10
+  'vps-20': { contaboProductId: 'V95', name: 'VPS 20' }, // Cloud VPS 20 (= the live prod server)
+  'vps-30': { contaboProductId: 'V98', name: 'VPS 30' }, // Cloud VPS 30
+  'vps-40': { contaboProductId: 'V101', name: 'VPS 40' }, // Cloud VPS 40 SSD (12c/48GB/500GB) — was V10 (VDS L)
+  'vps-50': { contaboProductId: 'V104', name: 'VPS 50' }, // Cloud VPS 50 SSD (16c/64GB/600GB) — was V11 (VDS XL)
+  'vps-60': { contaboProductId: 'V107', name: 'VPS 60' }, // Cloud VPS 60 SSD (18c/96GB/700GB) — was V16 (VDS XXL)
+  // Storage VPS (SSD, storage-optimised) — verified via GET /v1/products.
+  'storage-vps-10': { contaboProductId: 'V93', name: 'Storage VPS 10' }, // 2c/4GB/300GB SSD
+  'storage-vps-30': { contaboProductId: 'V99', name: 'Storage VPS 30' }, // 6c/18GB/1TB SSD
+  'storage-vps-40': { contaboProductId: 'V102', name: 'Storage VPS 40' }, // 8c/30GB/1.2TB SSD
+  'storage-vps-50': { contaboProductId: 'V105', name: 'Storage VPS 50' }, // 14c/50GB/1.4TB SSD
+  'vds-s': { contaboProductId: 'V8', name: 'VDS S' }, // Cloud VDS S
+  'vds-m': { contaboProductId: 'V9', name: 'VDS M' }, // Cloud VDS M
+  'vds-l': { contaboProductId: 'V10', name: 'VDS L' }, // Cloud VDS L
+  'vds-xl': { contaboProductId: 'V11', name: 'VDS XL' }, // Cloud VDS XL
+  'vds-xxl': { contaboProductId: 'V16', name: 'VDS XXL' }, // Cloud VDS XXL
 };
 
 // Contabo OS template to Contabo image ID mapping
 // These should be updated with actual Contabo image UUIDs; defaults used here
 const CONTABO_OS_IMAGE_MAP: Record<string, string> = {
+  // Real Contabo standard-image UUIDs (from GET /v1/compute/images?standardImage=true).
+  'ubuntu-24.04': 'd64d5c6c-9dda-4e38-8174-0ee282474d8a',
   'ubuntu-22.04': 'afecbb85-e2fc-46f0-9684-b46b1faf00bb',
-  'ubuntu-20.04': '66abdc44-132c-4636-bc38-be4f8a0f5b04',
-  'debian-12': 'b1a67a1d-5d1b-4c2b-9b8a-7c3d5e6f7a8b',
-  'debian-11': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-  'centos-9': 'c9d0e1f2-a3b4-c5d6-e7f8-901234567890',
-  'almalinux-9': 'a9b0c1d2-e3f4-5678-9abc-def012345678',
-  'rocky-9': 'r9o0c1k2-y3l4-5678-9abc-def012345678',
+  'debian-12': '4efbc0ba-2313-4fe1-842a-516f8652e729',
+  'debian-11': '66abf39a-ba8b-425e-a385-8eb347ceac10',
+  'almalinux-9': '81d9280e-8753-40ae-8aef-7f6e20751b85',
+  'rocky-9': 'fe6c2c36-031e-4474-aa5c-c5297196c80e',
+  'centos-9': '8b7c9b2a-ca59-48a2-92ea-5180779183cc', // centos-9-stream (no plain centos-9 image)
 };
 
 // RC Plan ID mapping for VPS
@@ -281,8 +292,8 @@ const HOSTING_PLANS: HostingPlan[] = [
       cpuCores: 4,
       ramGB: 8,
     },
-    priceMonthly: applyMarginEur(3.60), // NPR 799
-    priceYearly: applyMarginEur(3.60) * 10,
+    priceMonthly: applyContaboUsd(6.60), // Contabo Cloud VPS 10 12-mo $5.28 → NPR 1228
+    priceYearly: applyContaboUsd(6.60) * 10,
     currency: 'NPR',
     features: [
       '4 vCPU',
@@ -309,8 +320,8 @@ const HOSTING_PLANS: HostingPlan[] = [
       cpuCores: 6,
       ramGB: 12,
     },
-    priceMonthly: applyMarginEur(5.60), // NPR 1243
-    priceYearly: applyMarginEur(5.60) * 10,
+    priceMonthly: applyContaboUsd(9.00), // Contabo Cloud VPS 20 12-mo $7.20 → NPR 1674
+    priceYearly: applyContaboUsd(9.00) * 10,
     currency: 'NPR',
     features: [
       '6 vCPU',
@@ -338,8 +349,8 @@ const HOSTING_PLANS: HostingPlan[] = [
       cpuCores: 8,
       ramGB: 24,
     },
-    priceMonthly: applyMarginEur(11.20), // NPR 2486
-    priceYearly: applyMarginEur(11.20) * 10,
+    priceMonthly: applyContaboUsd(16.80), // Contabo Cloud VPS 30 12-mo $13.44 → NPR 3125
+    priceYearly: applyContaboUsd(16.80) * 10,
     currency: 'NPR',
     features: [
       '8 vCPU',
@@ -366,8 +377,8 @@ const HOSTING_PLANS: HostingPlan[] = [
       cpuCores: 12,
       ramGB: 48,
     },
-    priceMonthly: applyMarginEur(20.00), // NPR 4440
-    priceYearly: applyMarginEur(20.00) * 10,
+    priceMonthly: applyContaboUsd(30.00), // Contabo Cloud VPS 40 12-mo $24.00 → NPR 5580
+    priceYearly: applyContaboUsd(30.00) * 10,
     currency: 'NPR',
     features: [
       '12 vCPU',
@@ -394,8 +405,8 @@ const HOSTING_PLANS: HostingPlan[] = [
       cpuCores: 16,
       ramGB: 64,
     },
-    priceMonthly: applyMarginEur(29.60), // NPR 6571
-    priceYearly: applyMarginEur(29.60) * 10,
+    priceMonthly: applyContaboUsd(44.50), // Contabo Cloud VPS 50 12-mo $35.60 → NPR 8277
+    priceYearly: applyContaboUsd(44.50) * 10,
     currency: 'NPR',
     features: [
       '16 vCPU',
@@ -422,13 +433,126 @@ const HOSTING_PLANS: HostingPlan[] = [
       cpuCores: 18,
       ramGB: 96,
     },
-    priceMonthly: applyMarginEur(39.20), // NPR 8698
-    priceYearly: applyMarginEur(39.20) * 10,
+    priceMonthly: applyContaboUsd(58.80), // Contabo Cloud VPS 60 12-mo $47.04 → NPR 10937
+    priceYearly: applyContaboUsd(58.80) * 10,
     currency: 'NPR',
     features: [
       '18 vCPU',
       '96 GB RAM',
       '350 GB NVMe SSD',
+      '1 Gbit/s Bandwidth',
+      '1 Dedicated IPv4',
+      'Full Root Access',
+      'KVM Virtualization',
+      'DDoS Protection',
+      'Contabo Cloud',
+    ],
+  },
+  // ── Storage VPS (Contabo) ───────────────────────────────────────────────────
+  {
+    id: 'storage-vps-10',
+    name: 'Storage VPS 10',
+    type: 'STORAGE_VPS',
+    specs: {
+      diskGB: 300,
+      bandwidthGB: -1,
+      emailAccounts: 0,
+      subdomains: 0,
+      databases: 0,
+      cpuCores: 2,
+      ramGB: 4,
+    },
+    priceMonthly: applyContaboUsd(6.60), // Contabo Storage VPS 10 12-mo $5.28 → NPR 1228
+    priceYearly: applyContaboUsd(6.60) * 10,
+    currency: 'NPR',
+    features: [
+      '2 vCPU',
+      '4 GB RAM',
+      '300 GB SSD',
+      '200 Mbit/s Bandwidth',
+      '1 Dedicated IPv4',
+      'Full Root Access',
+      'KVM Virtualization',
+      'DDoS Protection',
+      'Contabo Cloud',
+    ],
+  },
+  {
+    id: 'storage-vps-30',
+    name: 'Storage VPS 30',
+    type: 'STORAGE_VPS',
+    specs: {
+      diskGB: 1000,
+      bandwidthGB: -1,
+      emailAccounts: 0,
+      subdomains: 0,
+      databases: 0,
+      cpuCores: 6,
+      ramGB: 18,
+    },
+    priceMonthly: applyContaboUsd(16.80), // Contabo Storage VPS 30 12-mo $13.44 → NPR 3125
+    priceYearly: applyContaboUsd(16.80) * 10,
+    currency: 'NPR',
+    features: [
+      '6 vCPU',
+      '18 GB RAM',
+      '1000 GB SSD',
+      '600 Mbit/s Bandwidth',
+      '1 Dedicated IPv4',
+      'Full Root Access',
+      'KVM Virtualization',
+      'DDoS Protection',
+      'Contabo Cloud',
+    ],
+  },
+  {
+    id: 'storage-vps-40',
+    name: 'Storage VPS 40',
+    type: 'STORAGE_VPS',
+    specs: {
+      diskGB: 1200,
+      bandwidthGB: -1,
+      emailAccounts: 0,
+      subdomains: 0,
+      databases: 0,
+      cpuCores: 8,
+      ramGB: 30,
+    },
+    priceMonthly: applyContaboUsd(30.00), // Contabo Storage VPS 40 12-mo $24.00 → NPR 5580
+    priceYearly: applyContaboUsd(30.00) * 10,
+    currency: 'NPR',
+    features: [
+      '8 vCPU',
+      '30 GB RAM',
+      '1200 GB SSD',
+      '800 Mbit/s Bandwidth',
+      '1 Dedicated IPv4',
+      'Full Root Access',
+      'KVM Virtualization',
+      'DDoS Protection',
+      'Contabo Cloud',
+    ],
+  },
+  {
+    id: 'storage-vps-50',
+    name: 'Storage VPS 50',
+    type: 'STORAGE_VPS',
+    specs: {
+      diskGB: 1400,
+      bandwidthGB: -1,
+      emailAccounts: 0,
+      subdomains: 0,
+      databases: 0,
+      cpuCores: 14,
+      ramGB: 50,
+    },
+    priceMonthly: applyContaboUsd(44.50), // Contabo Storage VPS 50 12-mo $35.60 → NPR 8277
+    priceYearly: applyContaboUsd(44.50) * 10,
+    currency: 'NPR',
+    features: [
+      '14 vCPU',
+      '50 GB RAM',
+      '1400 GB SSD',
       '1 Gbit/s Bandwidth',
       '1 Dedicated IPv4',
       'Full Root Access',
@@ -443,8 +567,8 @@ const HOSTING_PLANS: HostingPlan[] = [
     name: 'VDS S',
     type: 'VDS',
     specs: { diskGB: 180, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 3, ramGB: 24 },
-    priceMonthly: applyMarginEur(27.52), // NPR 6110
-    priceYearly: applyMarginEur(27.52) * 10,
+    priceMonthly: applyContaboUsd(46.40), // Contabo Cloud VDS S 12-mo $37.12 → NPR 8631
+    priceYearly: applyContaboUsd(46.40) * 10,
     currency: 'NPR',
     features: ['3 Dedicated Cores', '24 GB DDR5 ECC RAM', '180 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
   },
@@ -453,8 +577,8 @@ const HOSTING_PLANS: HostingPlan[] = [
     name: 'VDS M',
     type: 'VDS',
     specs: { diskGB: 240, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 4, ramGB: 32 },
-    priceMonthly: applyMarginEur(35.84), // NPR 7956
-    priceYearly: applyMarginEur(35.84) * 10,
+    priceMonthly: applyContaboUsd(55.20), // Contabo Cloud VDS M 12-mo $44.16 → NPR 10268
+    priceYearly: applyContaboUsd(55.20) * 10,
     currency: 'NPR',
     features: ['4 Dedicated Cores', '32 GB DDR5 ECC RAM', '240 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
     popular: true,
@@ -464,8 +588,8 @@ const HOSTING_PLANS: HostingPlan[] = [
     name: 'VDS L',
     type: 'VDS',
     specs: { diskGB: 360, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 6, ramGB: 48 },
-    priceMonthly: applyMarginEur(51.20), // NPR 11366
-    priceYearly: applyMarginEur(51.20) * 10,
+    priceMonthly: applyContaboUsd(83.20), // Contabo Cloud VDS L 12-mo $66.56 → NPR 15476
+    priceYearly: applyContaboUsd(83.20) * 10,
     currency: 'NPR',
     features: ['6 Dedicated Cores', '48 GB DDR5 ECC RAM', '360 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Contabo Cloud'],
   },
@@ -474,8 +598,8 @@ const HOSTING_PLANS: HostingPlan[] = [
     name: 'VDS XL',
     type: 'VDS',
     specs: { diskGB: 480, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 8, ramGB: 64 },
-    priceMonthly: applyMarginEur(65.92), // NPR 14634
-    priceYearly: applyMarginEur(65.92) * 10,
+    priceMonthly: applyContaboUsd(110.40), // Contabo Cloud VDS XL 12-mo $88.32 → NPR 20535
+    priceYearly: applyContaboUsd(110.40) * 10,
     currency: 'NPR',
     features: ['8 Dedicated Cores', '64 GB DDR5 ECC RAM', '480 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Priority Support', 'Contabo Cloud'],
   },
@@ -484,8 +608,8 @@ const HOSTING_PLANS: HostingPlan[] = [
     name: 'VDS XXL',
     type: 'VDS',
     specs: { diskGB: 720, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 12, ramGB: 96 },
-    priceMonthly: applyMarginEur(95.20), // NPR 21134
-    priceYearly: applyMarginEur(95.20) * 10,
+    priceMonthly: applyContaboUsd(156.00), // Contabo Cloud VDS XXL 12-mo $124.80 → NPR 29016
+    priceYearly: applyContaboUsd(156.00) * 10,
     currency: 'NPR',
     features: ['12 Dedicated Cores', '96 GB DDR5 ECC RAM', '720 GB NVMe SSD', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', '99.9% SLA', 'Priority Support', 'Contabo Cloud'],
   },
@@ -550,7 +674,7 @@ const HOSTING_PLANS: HostingPlan[] = [
 ];
 
 @Injectable()
-export class HostingService {
+export class HostingService implements OnModuleInit {
   private readonly logger = new Logger(HostingService.name);
 
   constructor(
@@ -564,6 +688,79 @@ export class HostingService {
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  /**
+   * Register the daily expiry-reminder sweep (Bull repeatable, 09:00) so ACTIVE
+   * VPS/VDS accounts get a "renew in 7 days" email before their contract term ends.
+   * Mirrors BillingService's dunning-sweep registration.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.provisioningQueue.add(
+        'expiry-reminder',
+        {},
+        {
+          repeat: { cron: '0 9 * * *' }, // daily 09:00
+          jobId: 'expiry-reminder-daily',
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+      this.logger.log('Scheduled daily VPS expiry-reminder sweep (09:00)');
+    } catch (e) {
+      this.logger.warn(`Could not schedule expiry-reminder sweep: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * Find ACTIVE VPS/VDS accounts whose contract expires within 7 days and haven't
+   * been reminded yet, and emit `hosting.expiry-reminder` for each (→ renewal email).
+   * Skips billing-exempt (isFree) users. Idempotent per term via expiryReminderSentAt.
+   * Called by the `expiry-reminder` provisioning-queue job and the admin endpoint.
+   */
+  async runExpiryReminderSweep(): Promise<{ reminded: number }> {
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const accounts = await this.prisma.hostingAccount.findMany({
+      where: {
+        status: HostingStatus.ACTIVE,
+        expiryDate: { gte: now, lte: in7Days },
+        expiryReminderSentAt: null,
+        user: { isFree: false },
+      },
+      include: { user: { select: { email: true, name: true } } },
+    });
+
+    let reminded = 0;
+    for (const acc of accounts) {
+      if (!acc.user?.email || !acc.expiryDate) continue;
+      // Atomically CLAIM this account before emitting, so a concurrent sweep (daily
+      // cron overlapping the manual admin trigger, or a double-click) can't send a
+      // duplicate reminder — only the invocation that flips the still-null row wins
+      // (count === 1). On send failure the email listener resets this flag so the
+      // next daily sweep retries instead of the reminder being silently lost.
+      const claim = await this.prisma.hostingAccount.updateMany({
+        where: { id: acc.id, expiryReminderSentAt: null },
+        data: { expiryReminderSentAt: now },
+      });
+      if (claim.count !== 1) continue;
+
+      this.eventEmitter.emit('hosting.expiry-reminder', {
+        hostingId: acc.id,
+        email: acc.user.email,
+        firstName: acc.user.name?.split(' ')[0] || 'Customer',
+        serviceName: acc.planName,
+        expiry: acc.expiryDate,
+      });
+      reminded++;
+    }
+
+    if (reminded > 0) {
+      this.logger.log(`Expiry-reminder sweep: sent ${reminded} renewal reminder(s)`);
+    }
+    return { reminded };
+  }
 
   /**
    * Check if a hosting account is a Contabo instance.
@@ -648,7 +845,7 @@ export class HostingService {
 
       // VPS & VDS use Contabo pricing (hardcoded in HOSTING_PLANS with EUR × 148 × 1.5)
       // Add contaboProductId to plan output for frontend
-      for (const plan of plans.filter(p => p.type === 'VPS' || p.type === 'VDS')) {
+      for (const plan of plans.filter(p => p.type === 'VPS' || p.type === 'VDS' || p.type === 'STORAGE_VPS')) {
         const contaboMapping = CONTABO_PRODUCT_MAP[plan.id];
         if (contaboMapping) {
           (plan as any).contaboProductId = contaboMapping.contaboProductId;
@@ -810,10 +1007,77 @@ export class HostingService {
   }
 
   async getMyHosting(userId: string) {
-    return this.prisma.hostingAccount.findMany({
+    const accounts = await this.prisma.hostingAccount.findMany({
       where: { userId, status: { not: HostingStatus.DELETED } },
       orderBy: { createdAt: 'desc' },
     });
+    // Rows have no hostname column — derive a display name for list UIs.
+    // NOTE: this is a hot path (used by every VPS sub-page for the server
+    // dropdown), so it must stay a single DB query — no per-server Contabo
+    // calls here. Live specs/usage enrichment lives in getVpsResourceStats().
+    return accounts.map((account) => ({
+      ...account,
+      hostname: this.vpsDisplayName(account),
+    }));
+  }
+
+  /**
+   * Real per-VPS resource data for the dashboard, sourced from Contabo's
+   * instance API. Contabo's public API exposes **allocated specs** (vCPU,
+   * RAM, disk size, status, region) — it does NOT expose live CPU/RAM/disk
+   * *utilisation* (no /metrics or /stats endpoint exists). So we return the
+   * real provisioned capacity, not a fabricated usage percentage.
+   *
+   * Kept off the hot getMyHosting() path: this is only called by the VPS
+   * analytics dashboard, and fans out one getInstance() call per server.
+   */
+  async getVpsResourceStats(userId: string) {
+    const accounts = await this.prisma.hostingAccount.findMany({
+      where: {
+        userId,
+        status: { not: HostingStatus.DELETED },
+        planType: { in: [HostingPlanType.VPS, HostingPlanType.CLOUD] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return Promise.all(
+      accounts.map(async (account) => {
+        const base = {
+          id: account.id,
+          hostname: this.vpsDisplayName(account),
+          status: account.status,
+          planName: account.planName,
+          planType: account.planType,
+          // Specs from Contabo (filled in below when reachable)
+          vcpu: null as number | null,
+          ramGb: null as number | null,
+          diskGb: null as number | null,
+          region: null as string | null,
+        };
+
+        if (!account.serverId) return base;
+        const serverId = parseInt(account.serverId, 10);
+        if (isNaN(serverId)) return base;
+
+        try {
+          const res = await this.contabo.getInstance(serverId);
+          const inst = res?.data?.[0];
+          if (inst) {
+            base.vcpu = inst.cpuCores ?? null;
+            base.ramGb = inst.ramMb ? Math.round(inst.ramMb / 1024) : null;
+            base.diskGb = inst.diskMb ? Math.round(inst.diskMb / 1024) : null;
+            base.region = inst.regionName ?? inst.region ?? null;
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Contabo specs fetch failed for ${account.id} (instance ${serverId}): ${(err as any)?.message}`,
+          );
+        }
+
+        return base;
+      }),
+    );
   }
 
   async getHostingDetails(id: string, userId: string) {
@@ -1650,17 +1914,40 @@ export class HostingService {
 
   async createVps(userId: string, dto: CreateVpsDto) {
     const plan = HOSTING_PLANS.find(
-      (p) => p.id === dto.planId && (p.type === 'VPS' || p.type === 'VDS'),
+      (p) =>
+        p.id === dto.planId &&
+        (p.type === 'VPS' || p.type === 'VDS' || p.type === 'STORAGE_VPS'),
     );
     if (!plan) {
       throw new BadRequestException(`VPS plan '${dto.planId}' not found`);
     }
 
     const provider = dto.provider || HostingProvider.CUSTOM;
+    const billingCycle = dto.billingCycle ?? BillingCycle.MONTHLY;
+    // No discount: term price = monthly plan price × months. expiryDate is set
+    // later, when the server actually provisions (provisionedAt + term).
+    const priceNpr = Math.round(plan.priceMonthly * BILLING_CYCLE_MONTHS[billingCycle]);
 
     this.logger.log(
-      `Creating VPS for user ${userId}, hostname: ${dto.hostname}, plan: ${dto.planId}, provider: ${provider}`,
+      `Creating VPS for user ${userId}, hostname: ${dto.hostname}, plan: ${dto.planId}, provider: ${provider}, term: ${billingCycle}`,
     );
+
+    // Admin-approval gate: create the request as PENDING_SETUP and DO NOT provision.
+    // A SUPER_ADMIN must approveVps() before any (billable) Contabo/RC/Proxmox
+    // provisioning runs. The request params are stashed as JSON in
+    // cpanelPasswordEncrypted (the provisioning processor overwrites it on success).
+    const pendingRequest = {
+      awaitingApproval: true,
+      planId: dto.planId,
+      osTemplate: dto.osTemplate,
+      hostname: dto.hostname,
+      containerStack: dto.containerStack ?? 'none',
+      sshKey: dto.sshKey ?? null,
+      rootPassword: dto.rootPassword ?? null,
+      datacenter: dto.datacenter ?? null,
+      provider,
+      billingCycle,
+    };
 
     const hosting = await this.prisma.hostingAccount.create({
       data: {
@@ -1668,82 +1955,348 @@ export class HostingService {
         planType: HostingPlanType.VPS,
         planName: plan.name,
         provider,
-        status: HostingStatus.PROVISIONING,
+        status: HostingStatus.PENDING_SETUP,
         diskSpaceMb: plan.specs.diskGB * 1024,
         bandwidthMb: plan.specs.bandwidthGB > 0 ? plan.specs.bandwidthGB * 1024 : 0,
         autoRenew: true,
+        billingCycle,
+        priceNpr,
+        cpanelPasswordEncrypted: JSON.stringify(pendingRequest),
       },
     });
 
-    // Check if the plan maps to a Contabo product
-    const contaboMapping = CONTABO_PRODUCT_MAP[dto.planId];
+    this.logger.log(
+      `VPS request ${hosting.id} created (PENDING SUPER_ADMIN approval) — user ${userId}, plan ${dto.planId}`,
+    );
 
-    if (provider === HostingProvider.RESELLERCLUB) {
-      // ResellerClub VPS provisioning flow
-      const rcCustomerId = await this.ensureRcCustomer(userId);
+    await this.logVpsAction(userId, 'VPS_REQUESTED', hosting, { plan: plan.name });
 
-      const jobData = {
+    // Acknowledge the request by email (listener sends "request received, pending review").
+    const requester = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true },
+    });
+    if (requester?.email) {
+      this.eventEmitter.emit('vps.requested', {
         hostingId: hosting.id,
-        userId,
+        email: requester.email,
+        firstName: requester.name?.split(' ')[0] || 'Customer',
+        planName: plan.name,
         hostname: dto.hostname,
-        planId: dto.planId,
-        rcCustomerId,
-      };
-
-      await this.provisioningQueue.add('provision-vps-rc', jobData, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 10000 },
-        removeOnComplete: true,
-        removeOnFail: false,
-      });
-    } else if (contaboMapping) {
-      // Contabo VPS/VDS provisioning flow (provider=CUSTOM with contabo metadata)
-      const imageId = CONTABO_OS_IMAGE_MAP[dto.osTemplate] || CONTABO_OS_IMAGE_MAP['ubuntu-22.04'];
-      const region = dto.datacenter || 'EU';
-
-      const jobData = {
-        hostingId: hosting.id,
-        productId: contaboMapping.contaboProductId,
-        imageId,
-        region,
-        displayName: dto.hostname,
-        rootPassword: undefined as number | undefined,
-        containerStack: dto.containerStack || 'none',
-      };
-
-      await this.provisioningQueue.add('provision-vps-contabo', jobData, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 10000 },
-        removeOnComplete: true,
-        removeOnFail: false,
-      });
-    } else {
-      // CUSTOM provider: existing Proxmox flow
-      const node = this.configService.get<string>('PROXMOX_NODE') || 'pve';
-
-      const jobData = {
-        hostingId: hosting.id,
-        userId,
-        hostname: dto.hostname,
-        planId: dto.planId,
-        osTemplate: dto.osTemplate,
-        sshKey: dto.sshKey,
-        rootPassword: dto.rootPassword,
-        node,
-      };
-
-      await this.provisioningQueue.add('provision-vps', jobData, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 10000 },
-        removeOnComplete: true,
-        removeOnFail: false,
       });
     }
 
-    this.logger.log(
-      `VPS account ${hosting.id} created, provisioning job queued`,
+    return { ...hosting, awaitingApproval: true };
+  }
+
+  /** Enqueue the actual provisioning job (Contabo / ResellerClub / Proxmox). */
+  private async enqueueVpsProvisioning(
+    hosting: { id: string; userId: string },
+    p: {
+      planId: string;
+      osTemplate: string;
+      hostname: string;
+      containerStack?: string | null;
+      sshKey?: string | null;
+      rootPassword?: string | null;
+      datacenter?: string | null;
+      provider: HostingProvider;
+    },
+  ): Promise<void> {
+    const opts = {
+      attempts: 3,
+      backoff: { type: 'exponential' as const, delay: 10000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    };
+    const contaboMapping = CONTABO_PRODUCT_MAP[p.planId];
+
+    if (p.provider === HostingProvider.RESELLERCLUB) {
+      const rcCustomerId = await this.ensureRcCustomer(hosting.userId);
+      await this.provisioningQueue.add(
+        'provision-vps-rc',
+        { hostingId: hosting.id, userId: hosting.userId, hostname: p.hostname, planId: p.planId, rcCustomerId },
+        opts,
+      );
+    } else if (contaboMapping) {
+      const imageId =
+        this.resolveContaboImageId(p.osTemplate) || CONTABO_OS_IMAGE_MAP['ubuntu-22.04'];
+      const region = p.datacenter || 'EU';
+      await this.provisioningQueue.add(
+        'provision-vps-contabo',
+        {
+          hostingId: hosting.id,
+          productId: contaboMapping.contaboProductId,
+          imageId,
+          region,
+          displayName: p.hostname,
+          // Plaintext creds from the order; the processor converts them into
+          // Contabo SECRETS (ssh/password) and passes the secret IDs.
+          sshKeyPlain: p.sshKey ?? null,
+          rootPasswordPlain: p.rootPassword ?? null,
+          rootPassword: undefined as number | undefined,
+          containerStack: p.containerStack || 'none',
+        },
+        opts,
+      );
+    } else {
+      const node = this.configService.get<string>('PROXMOX_NODE') || 'pve';
+      await this.provisioningQueue.add(
+        'provision-vps',
+        { hostingId: hosting.id, userId: hosting.userId, hostname: p.hostname, planId: p.planId, osTemplate: p.osTemplate, sshKey: p.sshKey ?? undefined, node },
+        opts,
+      );
+    }
+    this.logger.log(`VPS ${hosting.id} provisioning job queued (provider=${p.provider})`);
+  }
+
+  /** SUPER_ADMIN approves a pending VPS request → provisioning begins. */
+  async approveVps(hostingId: string) {
+    const hosting = await this.prisma.hostingAccount.findUnique({ where: { id: hostingId } });
+    if (!hosting) throw new NotFoundException(`VPS ${hostingId} not found`);
+
+    // Atomic compare-and-swap: only the caller that flips PENDING_SETUP →
+    // PROVISIONING wins. This closes the TOCTOU where two concurrent approvals
+    // could both pass a read-then-check and double-enqueue provisioning (which
+    // has no jobId to dedupe, so it would create two paid VMs).
+    const claim = await this.prisma.hostingAccount.updateMany({
+      where: { id: hostingId, status: HostingStatus.PENDING_SETUP },
+      data: { status: HostingStatus.PROVISIONING },
+    });
+    if (claim.count !== 1) {
+      throw new BadRequestException('This VPS is not awaiting approval');
+    }
+
+    let pending: Record<string, any> | null = null;
+    try {
+      pending = hosting.cpanelPasswordEncrypted ? JSON.parse(hosting.cpanelPasswordEncrypted) : null;
+    } catch {
+      pending = null;
+    }
+    // We've already claimed the row; if the pending blob is missing/unusable we
+    // can't provision — release the claim back to PENDING_SETUP and bail.
+    if (!pending?.awaitingApproval) {
+      await this.prisma.hostingAccount.update({
+        where: { id: hostingId },
+        data: { status: HostingStatus.PENDING_SETUP },
+      });
+      throw new BadRequestException('This VPS is not awaiting approval');
+    }
+
+    await this.enqueueVpsProvisioning(
+      { id: hosting.id, userId: hosting.userId },
+      {
+        planId: pending.planId,
+        osTemplate: pending.osTemplate,
+        hostname: pending.hostname,
+        containerStack: pending.containerStack,
+        sshKey: pending.sshKey,
+        rootPassword: pending.rootPassword,
+        datacenter: pending.datacenter,
+        provider: pending.provider as HostingProvider,
+      },
     );
-    return hosting;
+
+    this.logger.log(`VPS ${hostingId} APPROVED → provisioning started`);
+    await this.logVpsAction(hosting.userId, 'VPS_APPROVED', hosting);
+    return { id: hostingId, status: HostingStatus.PROVISIONING, approved: true };
+  }
+
+  /** SUPER_ADMIN rejects a pending VPS request. */
+  async rejectVps(hostingId: string, reason?: string) {
+    const hosting = await this.prisma.hostingAccount.findUnique({
+      where: { id: hostingId },
+      include: { user: { select: { email: true, name: true } } },
+    });
+    if (!hosting) throw new NotFoundException(`VPS ${hostingId} not found`);
+    if (hosting.status !== HostingStatus.PENDING_SETUP) {
+      throw new BadRequestException('This VPS is not awaiting approval');
+    }
+    // cpanelPasswordEncrypted currently holds the plaintext pending-request blob
+    // (root password / SSH key from the order). Purge it on cancel so rejected
+    // requests don't leave credentials at rest.
+    // TODO: encrypt pending VPS request blob (full at-rest encryption is a larger change)
+    await this.prisma.hostingAccount.update({
+      where: { id: hostingId },
+      data: { status: HostingStatus.CANCELLED, cpanelPasswordEncrypted: null },
+    });
+
+    if (hosting.user?.email) {
+      this.eventEmitter.emit('vps.rejected', {
+        hostingId,
+        email: hosting.user.email,
+        firstName: hosting.user.name?.split(' ')[0] || 'Customer',
+        serviceName: `VPS request (${hosting.planName})`,
+        planName: hosting.planName,
+        reason: reason ?? null,
+      });
+    }
+
+    this.logger.log(`VPS ${hostingId} REJECTED${reason ? ` — ${reason}` : ''}`);
+    await this.logVpsAction(hosting.userId, 'VPS_REJECTED', hosting, reason ? { reason } : {});
+    return { id: hostingId, status: HostingStatus.CANCELLED, rejected: true };
+  }
+
+  /** SUPER_ADMIN: list VPS requests awaiting approval. */
+  async getPendingVpsApprovals() {
+    const rows = await this.prisma.hostingAccount.findMany({
+      where: { status: HostingStatus.PENDING_SETUP },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { id: true, name: true, email: true, isFree: true } } },
+    });
+
+    return rows.flatMap((h) => {
+      let pending: Record<string, any> | null = null;
+      try {
+        pending = h.cpanelPasswordEncrypted ? JSON.parse(h.cpanelPasswordEncrypted) : null;
+      } catch {
+        pending = null;
+      }
+      if (!pending?.awaitingApproval) return [];
+      return [
+        {
+          id: h.id,
+          planName: h.planName,
+          provider: h.provider,
+          createdAt: h.createdAt,
+          hostname: pending.hostname,
+          osTemplate: pending.osTemplate,
+          planId: pending.planId,
+          user: h.user,
+        },
+      ];
+    });
+  }
+
+  /** SUPER_ADMIN: list pending plan-upgrade requests (Contabo plan changes are applied in the panel). */
+  async getPendingVpsUpgrades() {
+    const rows = await this.prisma.hostingAccount.findMany({
+      where: {
+        planType: HostingPlanType.VPS,
+        cpanelPasswordEncrypted: { contains: 'pendingUpgrade' },
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: { user: { select: { id: true, name: true, email: true, isFree: true } } },
+    });
+
+    return rows.flatMap((h) => {
+      let meta: Record<string, any> = {};
+      try {
+        meta = h.cpanelPasswordEncrypted ? JSON.parse(h.cpanelPasswordEncrypted) : {};
+      } catch {
+        return [];
+      }
+      if (!meta.pendingUpgrade) return [];
+      return [
+        {
+          id: h.id,
+          currentPlan: h.planName,
+          serverId: h.serverId,
+          ipAddress: h.ipAddress,
+          user: h.user,
+          ...meta.pendingUpgrade,
+        },
+      ];
+    });
+  }
+
+  /**
+   * SUPER_ADMIN: after applying a plan change in the Contabo panel, pull the live
+   * instance and sync our record (plan, specs, IP, status); clears pendingUpgrade.
+   */
+  async syncVpsFromContabo(hostingId: string) {
+    const hosting = await this.prisma.hostingAccount.findUnique({ where: { id: hostingId } });
+    if (!hosting) throw new NotFoundException(`VPS ${hostingId} not found`);
+    if (!this.isContaboInstance(hosting) || !hosting.serverId) {
+      throw new BadRequestException('Not a Contabo-backed VPS');
+    }
+
+    const res = await this.contabo.getInstance(parseInt(hosting.serverId, 10));
+    const inst = res?.data?.[0] || res?.data || res;
+    if (!inst?.productId) throw new BadRequestException('Could not read instance from Contabo');
+
+    let meta: Record<string, any> = {};
+    try {
+      meta = hosting.cpanelPasswordEncrypted ? JSON.parse(hosting.cpanelPasswordEncrypted) : {};
+    } catch {
+      meta = {};
+    }
+
+    // Resolve the plan from the live productId. Several Contabo product ids are
+    // shared by two of our plans (e.g. vps-40 and vds-l both map to V10), so a
+    // blind reverse-map mislabels VDS instances as VPS. Prefer the plan this
+    // account was already created/synced as — if its Contabo product id still
+    // matches inst.productId, keep it — and only fall back to the ambiguous
+    // reverse map when nothing stored matches.
+    let planId: string | undefined;
+    if (meta.pendingUpgrade?.newContaboProductId === inst.productId) {
+      planId = meta.pendingUpgrade.newPlanId;
+    } else {
+      // 1) trust a stored planId if it still maps to the live productId
+      const storedPlanId: string | undefined = meta.planId;
+      if (storedPlanId && CONTABO_PRODUCT_MAP[storedPlanId]?.contaboProductId === inst.productId) {
+        planId = storedPlanId;
+      } else {
+        // 2) trust the account's current planName if it disambiguates the duplicate
+        const byName = HOSTING_PLANS.find(
+          (p) =>
+            p.name === hosting.planName &&
+            CONTABO_PRODUCT_MAP[p.id]?.contaboProductId === inst.productId,
+        );
+        // 3) last resort: ambiguous reverse map (first matching entry wins)
+        planId =
+          byName?.id ??
+          Object.entries(CONTABO_PRODUCT_MAP).find(
+            ([, v]) => v.contaboProductId === inst.productId,
+          )?.[0];
+      }
+    }
+    const plan = HOSTING_PLANS.find((p) => p.id === planId);
+
+    const upgradeApplied = !!meta.pendingUpgrade && meta.pendingUpgrade.newContaboProductId === inst.productId;
+    if (upgradeApplied) delete meta.pendingUpgrade;
+    meta.productId = inst.productId;
+
+    const updated = await this.prisma.hostingAccount.update({
+      where: { id: hostingId },
+      data: {
+        planName: plan?.name ?? hosting.planName,
+        diskSpaceMb: inst.diskMb ?? (plan ? plan.specs.diskGB * 1024 : undefined),
+        ipAddress: inst.ipConfig?.v4?.ip ?? hosting.ipAddress,
+        status: inst.status === 'running' ? HostingStatus.ACTIVE : hosting.status,
+        cpanelPasswordEncrypted: JSON.stringify(meta),
+      },
+    });
+
+    this.logger.log(
+      `VPS ${hostingId} synced from Contabo: productId=${inst.productId} plan=${updated.planName} upgradeApplied=${upgradeApplied}`,
+    );
+
+    if (upgradeApplied) {
+      const owner = await this.prisma.user.findUnique({
+        where: { id: hosting.userId },
+        select: { email: true, name: true },
+      });
+      if (owner?.email) {
+        this.eventEmitter.emit('vps.upgrade-applied', {
+          hostingId,
+          email: owner.email,
+          firstName: owner.name?.split(' ')[0] || 'Customer',
+          serviceName: inst.displayName || updated.planName,
+          newPlan: updated.planName,
+          ipAddress: updated.ipAddress,
+        });
+      }
+    }
+    return {
+      id: hostingId,
+      planName: updated.planName,
+      productId: inst.productId,
+      ipAddress: updated.ipAddress,
+      status: updated.status,
+      upgradeApplied,
+      pendingUpgradeCleared: upgradeApplied,
+    };
   }
 
   async getVpsDetails(id: string, userId: string) {
@@ -1759,20 +2312,46 @@ export class HostingService {
       throw new ForbiddenException('You do not have access to this VPS');
     }
 
+    // Contract term details for the "Contract Period" / "Monthly Price" / "Expiry"
+    // fields on the detail page (all N/A-safe on the frontend). Computed once here
+    // so EVERY return branch (pending / Contabo / Proxmox / error) exposes them —
+    // not just the Contabo-success path.
+    const contractPeriod = BILLING_CYCLE_LABEL[hosting.billingCycle];
+    const plan = HOSTING_PLANS.find((p) => p.name === hosting.planName);
+    const monthlyPriceNpr =
+      plan?.priceMonthly ??
+      (hosting.priceNpr
+        ? Math.round(hosting.priceNpr / BILLING_CYCLE_MONTHS[hosting.billingCycle])
+        : null);
+
     if (!hosting.serverId) {
-      return { ...hosting, vmStatus: null };
+      return { ...hosting, vmStatus: null, contractPeriod, monthlyPriceNpr };
     }
 
     // Contabo instance
     if (this.isContaboInstance(hosting)) {
       try {
         const instanceData = await this.contabo.getInstance(parseInt(hosting.serverId, 10));
-        return { ...hosting, vmStatus: instanceData, vmConfig: null, provider: 'CONTABO' };
+        // Enrich with customer-facing extras the raw Contabo object lacks:
+        // a friendly OS label (reverse imageId lookup) and our NPR plan price.
+        const inst = Array.isArray(instanceData?.data) ? instanceData.data[0] : instanceData;
+        const osSlug = Object.entries(CONTABO_OS_IMAGE_MAP).find(
+          ([, uuid]) => uuid === inst?.imageId,
+        )?.[0];
+        return {
+          ...hosting,
+          vmStatus: instanceData,
+          vmConfig: null,
+          provider: 'CONTABO',
+          osLabel: osSlug ?? inst?.osType ?? null,
+          monthlyPriceNpr,
+          contractPeriod,
+        };
       } catch (error) {
         this.logger.error(
           `Could not fetch Contabo details for VPS ${id}: ${(error as Error).message}`,
         );
-        return { ...hosting, vmStatus: null, vmConfig: null, provider: 'CONTABO' };
+        return { ...hosting, vmStatus: null, vmConfig: null, provider: 'CONTABO', contractPeriod, monthlyPriceNpr };
       }
     }
 
@@ -1785,12 +2364,12 @@ export class HostingService {
         this.proxmox.node,
         parseInt(hosting.serverId, 10),
       );
-      return { ...hosting, vmStatus, vmConfig };
+      return { ...hosting, vmStatus, vmConfig, contractPeriod, monthlyPriceNpr };
     } catch (error) {
       this.logger.error(
         `Could not fetch Proxmox details for VPS ${id}: ${(error as Error).message}`,
       );
-      return { ...hosting, vmStatus: null, vmConfig: null };
+      return { ...hosting, vmStatus: null, vmConfig: null, contractPeriod, monthlyPriceNpr };
     }
   }
 
@@ -1804,10 +2383,12 @@ export class HostingService {
 
     if (this.isContaboInstance(hosting)) {
       await this.contabo.startInstance(parseInt(hosting.serverId!, 10));
+      await this.logVpsAction(userId, 'VPS_START', hosting);
       return { success: true, message: 'VPS start command issued via Contabo', id };
     }
 
     await this.proxmox.startVm(this.proxmox.node, parseInt(hosting.serverId!, 10));
+    await this.logVpsAction(userId, 'VPS_START', hosting);
     return { success: true, message: 'VPS start command issued', id };
   }
 
@@ -1821,10 +2402,12 @@ export class HostingService {
 
     if (this.isContaboInstance(hosting)) {
       await this.contabo.stopInstance(parseInt(hosting.serverId!, 10));
+      await this.logVpsAction(userId, 'VPS_STOP', hosting);
       return { success: true, message: 'VPS stop command issued via Contabo', id };
     }
 
     await this.proxmox.shutdownVm(this.proxmox.node, parseInt(hosting.serverId!, 10));
+    await this.logVpsAction(userId, 'VPS_STOP', hosting);
     return { success: true, message: 'VPS shutdown command issued', id };
   }
 
@@ -1834,16 +2417,49 @@ export class HostingService {
     if (hosting.provider === HostingProvider.RESELLERCLUB && hosting.rcOrderId) {
       this.logger.log(`Rebooting RC VPS order ${hosting.rcOrderId}`);
       await this.resellerClub.rebootVps(hosting.rcOrderId);
+      await this.logVpsAction(userId, 'VPS_RESTART', hosting);
       return { success: true, message: 'VPS reboot command issued via ResellerClub', id };
     }
 
     if (this.isContaboInstance(hosting)) {
       await this.contabo.restartInstance(parseInt(hosting.serverId!, 10));
+      await this.logVpsAction(userId, 'VPS_RESTART', hosting);
       return { success: true, message: 'VPS restart command issued via Contabo', id };
     }
 
     await this.proxmox.restartVm(this.proxmox.node, parseInt(hosting.serverId!, 10));
+    await this.logVpsAction(userId, 'VPS_RESTART', hosting);
     return { success: true, message: 'VPS restart command issued', id };
+  }
+
+  /** Live list of ALL Contabo standard OS images (cached 1h) — like the Contabo panel. */
+  private vpsImagesCache: { at: number; data: Array<Record<string, unknown>> } | null = null;
+
+  async getVpsImages() {
+    const TTL = 60 * 60 * 1000;
+    if (this.vpsImagesCache && Date.now() - this.vpsImagesCache.at < TTL) {
+      return this.vpsImagesCache.data;
+    }
+    const res = await this.contabo.listImages(true);
+    const rows = ((res?.data as any[]) ?? [])
+      .map((i) => ({
+        imageId: i.imageId,
+        name: i.name,
+        osType: i.osType,
+        version: i.version,
+      }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    if (rows.length > 0) this.vpsImagesCache = { at: Date.now(), data: rows };
+    return rows;
+  }
+
+  /** Accepts a raw Contabo image UUID (from getVpsImages) or a legacy slug. */
+  private resolveContaboImageId(osTemplate?: string | null): string | null {
+    if (!osTemplate) return null;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(osTemplate)) {
+      return osTemplate;
+    }
+    return CONTABO_OS_IMAGE_MAP[osTemplate] ?? null;
   }
 
   async reinstallVps(id: string, userId: string, dto: ReinstallVpsDto) {
@@ -1855,6 +2471,7 @@ export class HostingService {
         where: { id },
         data: { status: HostingStatus.PROVISIONING },
       });
+      await this.logVpsAction(userId, 'VPS_REINSTALL', hosting, { os: dto.osTemplate });
       return {
         success: true,
         message: 'Reinstall request submitted. Our team will process it within 1-2 hours.',
@@ -1864,20 +2481,70 @@ export class HostingService {
 
     if (this.isContaboInstance(hosting)) {
       const instanceId = parseInt(hosting.serverId!, 10);
-      const imageId = CONTABO_OS_IMAGE_MAP[dto.osTemplate] || CONTABO_OS_IMAGE_MAP['ubuntu-22.04'];
+      const imageId = this.resolveContaboImageId(dto.osTemplate);
+      if (!imageId) {
+        throw new BadRequestException(
+          `Unknown OS '${dto.osTemplate}'. Choose one from GET /hosting/vps-images.`,
+        );
+      }
 
-      this.logger.log(`Reinstalling Contabo instance ${instanceId} with image ${imageId}`);
+      // Optional cloud-init container stack (Docker / k3s / Portainer).
+      const userData =
+        dto.containerStack && dto.containerStack !== 'none'
+          ? this.dockerService.getInstallScriptForType(dto.containerStack) || undefined
+          : undefined;
+
+      // Optional new credentials — Contabo takes secret IDs, so convert first.
+      const suffix = `${id.slice(0, 8)}-${Date.now() % 1_000_000}`;
+      let rootPasswordSecret: number | undefined;
+      let sshKeyIds: number[] | undefined;
+      const secretIdOf = (sec: any): number | undefined => {
+        const r = sec?.data?.[0] ?? sec?.data ?? sec;
+        return r?.secretId ? Number(r.secretId) : undefined;
+      };
+      if (dto.rootPassword) {
+        try {
+          rootPasswordSecret = secretIdOf(
+            await this.contabo.createSecret(`hn-ri-pw-${suffix}`, dto.rootPassword, 'password'),
+          );
+        } catch (e) {
+          this.logger.warn(`reinstall password secret failed for ${id}: ${(e as Error).message}`);
+        }
+      }
+      if (dto.sshKey) {
+        try {
+          const sid = secretIdOf(
+            await this.contabo.createSecret(`hn-ri-ssh-${suffix}`, dto.sshKey.trim(), 'ssh'),
+          );
+          if (sid) sshKeyIds = [sid];
+        } catch (e) {
+          this.logger.warn(`reinstall ssh secret failed for ${id}: ${(e as Error).message}`);
+        }
+      }
+
+      this.logger.log(
+        `Reinstalling Contabo instance ${instanceId} with image ${imageId}` +
+          `${userData ? ' + container stack' : ''}${rootPasswordSecret ? ' + new password' : ''}${sshKeyIds ? ' + ssh key' : ''}`,
+      );
       await this.prisma.hostingAccount.update({
         where: { id },
         data: { status: HostingStatus.PROVISIONING },
       });
 
       try {
-        await this.contabo.reinstallInstance(instanceId, imageId);
+        await this.contabo.reinstallInstance(
+          instanceId,
+          imageId,
+          undefined,
+          rootPasswordSecret,
+          sshKeyIds,
+          userData,
+        );
         await this.prisma.hostingAccount.update({
           where: { id },
           data: { status: HostingStatus.ACTIVE },
         });
+        await this.logVpsAction(userId, 'VPS_REINSTALL', hosting, { os: dto.osTemplate });
         return { success: true, message: 'VPS reinstall initiated via Contabo', id };
       } catch (error) {
         this.logger.error(`Contabo reinstall failed for ${id}: ${(error as Error).message}`);
@@ -1910,6 +2577,9 @@ export class HostingService {
       planId: hosting.planName,
       osTemplate: dto.osTemplate,
       node,
+      // Reinstall reuses the provision-vps job; flag it so the email listener
+      // doesn't re-fire the full "Your VPS is ready" welcome on a reinstall.
+      isReinstall: true,
     };
 
     await this.provisioningQueue.add('provision-vps', jobData, {
@@ -1917,6 +2587,7 @@ export class HostingService {
       backoff: { type: 'exponential', delay: 10000 },
     });
 
+    await this.logVpsAction(userId, 'VPS_REINSTALL', hosting, { os: dto.osTemplate });
     return { message: 'VPS reinstall initiated', id };
   }
 
@@ -1933,6 +2604,7 @@ export class HostingService {
       try {
         const instanceId = parseInt(hosting.serverId!, 10);
         const result = await this.contabo.createSnapshot(instanceId, dto.name);
+        await this.logVpsAction(userId, 'VPS_SNAPSHOT_CREATE', hosting, { snapshot: dto.name });
         return { success: true, message: 'Snapshot creation initiated via Contabo', data: result };
       } catch (error) {
         this.logger.error(`Failed to create Contabo snapshot for VPS ${id}: ${(error as Error).message}`);
@@ -1943,6 +2615,7 @@ export class HostingService {
     try {
       const vmId = parseInt(hosting.serverId!, 10);
       const result = await this.proxmox.createSnapshot(this.proxmox.node, vmId, dto.name);
+      await this.logVpsAction(userId, 'VPS_SNAPSHOT_CREATE', hosting, { snapshot: dto.name });
       return { success: true, message: 'Snapshot creation initiated', data: result };
     } catch (error) {
       this.logger.error(`Failed to create snapshot for VPS ${id}: ${(error as Error).message}`);
@@ -1989,6 +2662,7 @@ export class HostingService {
       try {
         const instanceId = parseInt(hosting.serverId!, 10);
         const result = await this.contabo.rollbackSnapshot(instanceId, snapId);
+        await this.logVpsAction(userId, 'VPS_SNAPSHOT_RESTORE', hosting, { snapshot: snapId });
         return { success: true, message: 'Snapshot rollback initiated via Contabo', data: result };
       } catch (error) {
         this.logger.error(`Failed to restore Contabo snapshot for VPS ${id}: ${(error as Error).message}`);
@@ -1999,6 +2673,7 @@ export class HostingService {
     try {
       const vmId = parseInt(hosting.serverId!, 10);
       const result = await this.proxmox.rollbackSnapshot(this.proxmox.node, vmId, snapId);
+      await this.logVpsAction(userId, 'VPS_SNAPSHOT_RESTORE', hosting, { snapshot: snapId });
       return { success: true, message: 'Snapshot rollback initiated', data: result };
     } catch (error) {
       this.logger.error(`Failed to restore snapshot for VPS ${id}: ${(error as Error).message}`);
@@ -2017,6 +2692,7 @@ export class HostingService {
       try {
         const instanceId = parseInt(hosting.serverId!, 10);
         const result = await this.contabo.deleteSnapshot(instanceId, snapId);
+        await this.logVpsAction(userId, 'VPS_SNAPSHOT_DELETE', hosting, { snapshot: snapId });
         return { success: true, message: 'Snapshot deletion initiated via Contabo', data: result };
       } catch (error) {
         this.logger.error(`Failed to delete Contabo snapshot for VPS ${id}: ${(error as Error).message}`);
@@ -2027,6 +2703,7 @@ export class HostingService {
     try {
       const vmId = parseInt(hosting.serverId!, 10);
       const result = await this.proxmox.deleteSnapshot(this.proxmox.node, vmId, snapId);
+      await this.logVpsAction(userId, 'VPS_SNAPSHOT_DELETE', hosting, { snapshot: snapId });
       return { success: true, message: 'Snapshot deletion initiated', data: result };
     } catch (error) {
       this.logger.error(`Failed to delete snapshot for VPS ${id}: ${(error as Error).message}`);
@@ -2128,11 +2805,13 @@ export class HostingService {
           'guest-set-user-password',
           JSON.stringify({ username: 'root', password: dto.newPassword }),
         );
+        await this.logVpsAction(userId, 'VPS_PASSWORD_RESET', hosting);
         return { success: true, message: 'Password updated via guest agent' };
       } catch {
         // Fallback to cloud-init
         this.logger.warn(`Guest agent not available for VM ${vmId}, trying cloud-init`);
         await this.proxmox.setVmConfig(node, vmId, { cipassword: dto.newPassword });
+        await this.logVpsAction(userId, 'VPS_PASSWORD_RESET', hosting);
         return {
           success: true,
           message: 'Password set via cloud-init. A reboot may be required for the change to take effect.',
@@ -2157,26 +2836,55 @@ export class HostingService {
     }
 
     if (this.isContaboInstance(hosting)) {
+      // Contabo's public API cannot change an instance's plan (PATCH only renames;
+      // POST /upgrade only adds add-ons). Plan changes must be done in the Contabo
+      // panel — so record an UPGRADE REQUEST for the SUPER_ADMIN, who applies it
+      // in the panel and then syncs this record from the live instance.
       const contaboMapping = CONTABO_PRODUCT_MAP[dto.newPlanId];
       if (!contaboMapping) {
         throw new BadRequestException(`No Contabo product mapping found for plan '${dto.newPlanId}'`);
       }
+
+      let meta: Record<string, any> = {};
       try {
-        const instanceId = parseInt(hosting.serverId!, 10);
-        await this.contabo.upgradeInstance(instanceId, contaboMapping.contaboProductId);
-        await this.prisma.hostingAccount.update({
-          where: { id },
-          data: {
-            planName: newPlan.name,
-            diskSpaceMb: newPlan.specs.diskGB * 1024,
-            bandwidthMb: newPlan.specs.bandwidthGB > 0 ? newPlan.specs.bandwidthGB * 1024 : 0,
-          },
-        });
-        return { success: true, message: 'VPS upgrade initiated via Contabo', provider: 'CONTABO' };
-      } catch (error) {
-        this.logger.error(`Failed to upgrade Contabo VPS ${id}: ${(error as Error).message}`);
-        throw error;
+        meta = hosting.cpanelPasswordEncrypted ? JSON.parse(hosting.cpanelPasswordEncrypted) : {};
+      } catch {
+        meta = {};
       }
+      meta.pendingUpgrade = {
+        newPlanId: dto.newPlanId,
+        newPlanName: newPlan.name,
+        newContaboProductId: contaboMapping.contaboProductId,
+        requestedAt: new Date().toISOString(),
+      };
+
+      await this.prisma.hostingAccount.update({
+        where: { id },
+        data: { cpanelPasswordEncrypted: JSON.stringify(meta) },
+      });
+
+      this.eventEmitter.emit('vps.upgrade-requested', {
+        hostingId: id,
+        userId,
+        currentPlan: hosting.planName,
+        newPlanId: dto.newPlanId,
+        newPlanName: newPlan.name,
+      });
+
+      this.logger.log(
+        `VPS ${id} upgrade REQUESTED: ${hosting.planName} → ${newPlan.name} (admin applies in Contabo panel, then syncs)`,
+      );
+      await this.logVpsAction(userId, 'VPS_UPGRADE_REQUEST', hosting, {
+        from: hosting.planName,
+        to: newPlan.name,
+      });
+      return {
+        success: true,
+        requiresApproval: true,
+        provider: 'CONTABO',
+        message:
+          'Upgrade request submitted. An administrator will apply it shortly — your server keeps running until then.',
+      };
     }
 
     if (hosting.provider === HostingProvider.RESELLERCLUB) {
@@ -2191,6 +2899,10 @@ export class HostingService {
             diskSpaceMb: newPlan.specs.diskGB * 1024,
             bandwidthMb: newPlan.specs.bandwidthGB > 0 ? newPlan.specs.bandwidthGB * 1024 : 0,
           },
+        });
+        await this.logVpsAction(userId, 'VPS_UPGRADE', hosting, {
+          from: hosting.planName,
+          to: newPlan.name,
         });
         return { success: true, message: 'VPS upgrade initiated via ResellerClub' };
       } catch (error) {
@@ -2226,6 +2938,10 @@ export class HostingService {
         },
       });
 
+      await this.logVpsAction(userId, 'VPS_UPGRADE', hosting, {
+        from: hosting.planName,
+        to: newPlan.name,
+      });
       return { success: true, message: 'VPS upgraded successfully. A reboot may be required for CPU/RAM changes.' };
     } catch (error) {
       this.logger.error(`Failed to upgrade VPS ${id}: ${(error as Error).message}`);
@@ -2578,6 +3294,85 @@ export class HostingService {
     }
 
     return hosting;
+  }
+
+  /**
+   * Best-available display name for a hosting row — there is no hostname column.
+   * cPanel accounts use cpanelUsername; pending VPS requests stash the hostname
+   * in the cpanelPasswordEncrypted JSON blob; provisioned Contabo instances keep
+   * neither, so fall back to the live instance id.
+   */
+  private vpsDisplayName(hosting: {
+    cpanelUsername?: string | null;
+    cpanelPasswordEncrypted?: string | null;
+    serverId?: string | null;
+    planName: string;
+  }): string {
+    if (hosting.cpanelUsername) return hosting.cpanelUsername;
+    try {
+      const meta = hosting.cpanelPasswordEncrypted
+        ? JSON.parse(hosting.cpanelPasswordEncrypted)
+        : null;
+      if (typeof meta?.hostname === 'string' && meta.hostname) return meta.hostname;
+    } catch {
+      // blob is an encrypted password, not JSON
+    }
+    return hosting.serverId ? `vps-${hosting.serverId}` : hosting.planName;
+  }
+
+  /** Record a VPS action in the activity log. Never fails the request itself. */
+  private async logVpsAction(
+    userId: string,
+    action: string,
+    hosting: {
+      id: string;
+      provider: HostingProvider;
+      cpanelUsername?: string | null;
+      cpanelPasswordEncrypted?: string | null;
+      serverId?: string | null;
+      planName: string;
+    },
+    details: Record<string, unknown> = {},
+  ): Promise<void> {
+    try {
+      await this.prisma.activityLog.create({
+        data: {
+          userId,
+          action,
+          resourceType: 'VPS',
+          resourceId: hosting.id,
+          details: {
+            hostname: this.vpsDisplayName(hosting),
+            provider: hosting.provider,
+            ...details,
+          } as any,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to log VPS activity ${action} for ${hosting.id}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /** Recent VPS actions for the dashboard "Recent Actions" panel. */
+  async getRecentVpsActivity(userId: string, limit = 10) {
+    const logs = await this.prisma.activityLog.findMany({
+      where: { userId, resourceType: 'VPS' },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 50),
+    });
+    return logs.map((log) => {
+      const details = (log.details ?? {}) as Record<string, unknown>;
+      return {
+        id: log.id,
+        action: log.action,
+        hostname: typeof details.hostname === 'string' ? details.hostname : null,
+        resourceId: log.resourceId,
+        details,
+        createdAt: log.createdAt,
+      };
+    });
   }
 
   // ── Container Management ──────────────────────────────────────────────────

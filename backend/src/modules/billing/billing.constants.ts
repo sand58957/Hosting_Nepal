@@ -22,6 +22,7 @@ export const BILLING_JOBS = {
   INVOICE_GENERATION: 'invoice-generation',
   DUNNING_EMAIL: 'dunning-email',
   PAYMENT_EXPIRY_CHECK: 'payment-expiry-check',
+  DUNNING_SWEEP: 'dunning-sweep',
 } as const;
 
 export const BILLING_EVENTS = {

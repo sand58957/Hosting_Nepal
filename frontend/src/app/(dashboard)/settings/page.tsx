@@ -48,6 +48,7 @@ const SettingsPage = () => {
   const [billingAlerts, setBillingAlerts] = useState(true)
   const [domainExpiry, setDomainExpiry] = useState(true)
   const [marketingEmails, setMarketingEmails] = useState(false)
+  const [notifMessage, setNotifMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Site Config (admin only)
   const [whatsappNumber, setWhatsappNumber] = useState('9779802348957')
@@ -65,6 +66,33 @@ const SettingsPage = () => {
       setTwoFactorEnabled(user.twoFactorEnabled || false)
     }
   }, [user])
+
+  // Load notification prefs from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hn-notification-prefs')
+      if (saved) {
+        const p = JSON.parse(saved)
+        if (typeof p.emailNotifications === 'boolean') setEmailNotifications(p.emailNotifications)
+        if (typeof p.billingAlerts === 'boolean') setBillingAlerts(p.billingAlerts)
+        if (typeof p.domainExpiry === 'boolean') setDomainExpiry(p.domainExpiry)
+        if (typeof p.ticketUpdates === 'boolean') setTicketUpdates(p.ticketUpdates)
+        if (typeof p.marketingEmails === 'boolean') setMarketingEmails(p.marketingEmails)
+      }
+    } catch {}
+  }, [])
+
+  const handleNotificationSave = () => {
+    try {
+      localStorage.setItem('hn-notification-prefs', JSON.stringify({
+        emailNotifications, billingAlerts, domainExpiry, ticketUpdates, marketingEmails,
+      }))
+      setNotifMessage({ type: 'success', text: 'Notification preferences saved.' })
+    } catch {
+      setNotifMessage({ type: 'error', text: 'Failed to save preferences.' })
+    }
+    setTimeout(() => setNotifMessage(null), 3000)
+  }
 
   const handleProfileSave = async () => {
     setProfileSaving(true)
@@ -295,6 +323,11 @@ const SettingsPage = () => {
             {/* Notifications Tab */}
             {currentTab === 2 && (
               <Box sx={{ maxWidth: 600 }}>
+                {notifMessage && (
+                  <Alert severity={notifMessage.type} onClose={() => setNotifMessage(null)} sx={{ mb: 3 }}>
+                    {notifMessage.text}
+                  </Alert>
+                )}
                 <Typography variant='h6' sx={{ mb: 3 }}>
                   Email Preferences
                 </Typography>
@@ -330,7 +363,7 @@ const SettingsPage = () => {
                     label='Marketing and promotional emails'
                   />
                 </Box>
-                <Button variant='contained' sx={{ mt: 3 }}>
+                <Button variant='contained' onClick={handleNotificationSave} sx={{ mt: 3 }}>
                   Save Preferences
                 </Button>
               </Box>

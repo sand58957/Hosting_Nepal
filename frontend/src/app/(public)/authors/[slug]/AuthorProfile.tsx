@@ -117,7 +117,7 @@ const AuthorProfile = ({ slug }: { slug: string }) => {
       <Container maxWidth='lg' sx={{ py: { xs: 5, md: 8 } }}>
         <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <Avatar src={author.avatarUrl || undefined} sx={{ width: 120, height: 120, bgcolor: '#28C76F', fontSize: 48, fontWeight: 700 }}>
-            {author.name.charAt(0)}
+            {author.name?.charAt(0) || 'A'}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 260 }}>
             <Typography variant='overline' sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5 }}>Author</Typography>
@@ -196,7 +196,7 @@ const AuthorProfile = ({ slug }: { slug: string }) => {
       {/* Footer */}
       <Box sx={{ bgcolor: '#131325', py: 4, textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <Typography variant='body2' sx={{ color: 'rgba(255,255,255,0.3)' }}>
-          {new Date().getFullYear()} &copy; Marketnminds Investment Group
+          {new Date().getFullYear()} &copy; Marketminds Investment Group
         </Typography>
       </Box>
     </Box>

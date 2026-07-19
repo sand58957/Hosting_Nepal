@@ -188,7 +188,7 @@ const BlogCreatePage = () => {
 
   const addFaqItem = () => setFaqItems([...faqItems, { q: '', a: '' }])
   const updateFaq = (idx: number, field: 'q' | 'a', val: string) => {
-    const updated = [...faqItems]; updated[idx][field] = val; setFaqItems(updated)
+    setFaqItems(prev => prev.map((item, i) => (i === idx ? { ...item, [field]: val } : item)))
   }
   const removeFaq = (idx: number) => setFaqItems(faqItems.filter((_, i) => i !== idx))
 

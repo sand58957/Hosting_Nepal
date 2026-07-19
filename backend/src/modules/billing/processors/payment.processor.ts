@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../database/prisma.service';
+import { BillingService } from '../billing.service';
 import {
   BILLING_QUEUES,
   BILLING_JOBS,
@@ -40,7 +41,21 @@ export class PaymentProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly billingService: BillingService,
   ) {}
+
+  @Process(BILLING_JOBS.DUNNING_SWEEP)
+  async processDunningSweep(): Promise<void> {
+    this.logger.log('Daily dunning sweep starting (bull repeatable)');
+    try {
+      const result = await this.billingService.runDunningSweep();
+      this.logger.log(
+        `Daily dunning sweep done: ${result.reminders} reminders, ${result.warnings} warnings (${result.unpaidInvoices} unpaid invoices)`,
+      );
+    } catch (e) {
+      this.logger.error(`Daily dunning sweep failed: ${(e as Error).message}`);
+    }
+  }
 
   @Process(BILLING_JOBS.PAYMENT_RETRY)
   async processPaymentRetry(job: Job<PaymentRetryPayload>) {

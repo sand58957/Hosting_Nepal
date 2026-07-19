@@ -70,7 +70,11 @@ const Navigation = (props: Props) => {
   const scrollMenu = (container: any, isPerfectScrollbar: boolean) => {
     container = isBreakpointReached || !isPerfectScrollbar ? container.target : container
 
-    if (shadowRef && container.scrollTop > 0) {
+    // Guard on .current (not the ref object, which is always truthy): the scroll
+    // event can fire while the shadow node is detached, leaving current null.
+    if (!shadowRef.current) return
+
+    if (container.scrollTop > 0) {
       // @ts-ignore
       if (!shadowRef.current.classList.contains('scrolled')) {
         // @ts-ignore

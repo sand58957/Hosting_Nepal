@@ -6,8 +6,10 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ResellerClubService,
@@ -17,6 +19,7 @@ import {
   NameSiloService,
   NameSiloApiError,
 } from './services/namesilo.service';
+import { CloudflareDnsService } from './services/cloudflare.service';
 import { RegisterDomainDto } from './dto/register-domain.dto';
 import { AddDnsRecordDto, UpdateDnsRecordDto } from './dto/dns-record.dto';
 import { InitiateTransferDto } from './dto/transfer.dto';
@@ -60,6 +63,7 @@ export class DomainService {
   constructor(
     private readonly resellerClub: ResellerClubService,
     private readonly nameSilo: NameSiloService,
+    private readonly cloudflareDns: CloudflareDnsService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
@@ -340,24 +344,40 @@ export class DomainService {
    * NameSilo uses the account's default contact profile.
    * WHOIS privacy is FREE and enabled by default.
    */
-  async registerDomain(
+  /**
+   * STEP 1 — any authenticated user submits a domain registration REQUEST.
+   * Nothing is purchased yet: the request parks at PENDING_APPROVAL until a
+   * SUPER_ADMIN approves it (which is when the real-money NameSilo registration
+   * actually runs). Mirrors the VPS approval gate.
+   */
+  async requestDomainRegistration(
     userId: string,
     dto: RegisterDomainDto,
   ): Promise<Record<string, unknown>> {
     const { domainName, years, nameservers, registrantContact, privacyProtection, autoRenew } = dto;
 
-    // 1. Check the domain isn't already in our DB
-    const existing = await this.prisma.domain.findFirst({
-      where: { domainName, status: { not: 'EXPIRED' } },
-    });
-    if (existing) {
-      throw new ConflictException(`Domain ${domainName} is already registered in our system`);
+    // 1. Dedup. @@unique([domainName, tld]) allows at most ONE row per domain, so
+    //    a leftover terminal-state row (REJECTED/EXPIRED/DELETED) must be REUSED —
+    //    a second create() would throw a P2002 unique-constraint error (→ 500).
+    const existing = await this.prisma.domain.findFirst({ where: { domainName } });
+    const liveStatuses = [
+      'ACTIVE',
+      'PENDING_APPROVAL',
+      'PENDING_REGISTRATION',
+      'PENDING_TRANSFER',
+      'PENDING_DELETION',
+      'SUSPENDED',
+    ];
+    if (existing && liveStatuses.includes(existing.status)) {
+      throw new ConflictException(
+        existing.status === 'PENDING_APPROVAL'
+          ? `A registration request for ${domainName} is already pending approval`
+          : `Domain ${domainName} is already registered in our system`,
+      );
     }
 
-    // 2. Verify availability via NameSilo
-    const sld = domainName.split('.')[0];
+    // 2. Verify availability via NameSilo before accepting the request
     const tld = domainName.split('.').slice(1).join('.');
-
     const nsAvailability = await this.nameSilo.checkAvailability([domainName]);
     const domainResult = nsAvailability.find(
       (r) => r.domain.toLowerCase() === domainName.toLowerCase(),
@@ -368,28 +388,181 @@ export class DomainService {
       );
     }
 
+    // 3. Park the request — no registrar call yet. Reuse a leftover terminal-state
+    //    row if one exists (otherwise the unique constraint rejects a second row).
+    const ns = nameservers?.length ? nameservers : this.defaultNameservers;
+    const requestMeta = {
+      years: years || 1,
+      registrantContact: registrantContact ? { ...registrantContact } : null,
+      privacyProtection: privacyProtection !== false,
+      autoRenew: autoRenew !== false,
+      requestedAt: new Date().toISOString(),
+    } as Prisma.InputJsonValue;
+
+    const domain = existing
+      ? await this.prisma.domain.update({
+          where: { id: existing.id },
+          data: {
+            userId,
+            tld,
+            status: 'PENDING_APPROVAL',
+            autoRenew: autoRenew !== false,
+            privacyProtection: privacyProtection !== false,
+            nameservers: ns,
+            rcOrderId: null,
+            registrationDate: null,
+            expiryDate: null,
+            requestMeta,
+          },
+        })
+      : await this.prisma.domain.create({
+          data: {
+            id: uuidv4(),
+            userId,
+            domainName,
+            tld,
+            status: 'PENDING_APPROVAL',
+            autoRenew: autoRenew !== false,
+            privacyProtection: privacyProtection !== false,
+            nameservers: ns,
+            requestMeta,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+
+    this.logger.log(
+      `Domain registration REQUESTED: ${domainName} by user ${userId} (id ${domain.id})`,
+    );
+
+    return {
+      id: domain.id,
+      domainName: domain.domainName,
+      status: 'PENDING_APPROVAL',
+      message: 'Registration request submitted — pending admin approval',
+    };
+  }
+
+  /** SUPER_ADMIN: list domain registration requests awaiting approval. */
+  async listPendingDomainRegistrations(): Promise<Record<string, unknown>[]> {
+    const rows = await this.prisma.domain.findMany({
+      where: { status: 'PENDING_APPROVAL' },
+      include: { user: { select: { id: true, name: true, email: true, isFree: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return rows.map((d) => {
+      const meta = (d.requestMeta as Record<string, any>) || {};
+      return {
+        id: d.id,
+        domainName: d.domainName,
+        tld: d.tld,
+        years: meta.years ?? 1,
+        nameservers: d.nameservers ?? [],
+        registrantProvided: !!meta.registrantContact,
+        createdAt: d.createdAt,
+        user: d.user,
+      };
+    });
+  }
+
+  /**
+   * STEP 2 — SUPER_ADMIN approves a pending request, which runs the real
+   * NameSilo registration. An atomic compare-and-swap on PENDING_APPROVAL
+   * closes the double-approve race (two approvals would double-register/charge).
+   */
+  async approveDomainRegistration(domainId: string): Promise<Record<string, unknown>> {
+    // Claim: only the approver that flips PENDING_APPROVAL → PENDING_REGISTRATION wins.
+    const claim = await this.prisma.domain.updateMany({
+      where: { id: domainId, status: 'PENDING_APPROVAL' },
+      data: { status: 'PENDING_REGISTRATION' },
+    });
+    if (claim.count !== 1) {
+      throw new BadRequestException('This domain is not awaiting approval');
+    }
+
+    const domain = await this.prisma.domain.findUnique({
+      where: { id: domainId },
+      include: { user: true },
+    });
+    if (!domain || !domain.user) {
+      throw new NotFoundException('Domain or owner not found');
+    }
+
+    const meta = (domain.requestMeta as Record<string, any>) || {};
+    const years = meta.years || 1;
+    const ns =
+      Array.isArray(domain.nameservers) && domain.nameservers.length
+        ? (domain.nameservers as string[])
+        : this.defaultNameservers;
+    const privacyProtection = meta.privacyProtection !== false;
+    const autoRenew = meta.autoRenew !== false;
+
+    // True only once we've actually called the registrar — past this point a
+    // failure is AMBIGUOUS (NameSilo may have charged + registered even if the
+    // HTTP response was lost), so we must NOT roll back into the re-approvable
+    // PENDING_APPROVAL state and risk a double charge.
+    let attemptedRegistration = false;
+
     try {
-      // 3. Ensure user exists
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        throw new NotFoundException('User not found');
+      // Re-verify availability at approval time (it may have been taken since the
+      // request). This runs BEFORE any charge, so failures here are safe to retry.
+      const nsAvailability = await this.nameSilo.checkAvailability([domain.domainName]);
+      const avail = nsAvailability.find(
+        (r) => r.domain.toLowerCase() === domain.domainName.toLowerCase(),
+      );
+      if (!avail || !avail.available) {
+        // Definitively taken — reject so it leaves the approval queue instead of
+        // looping forever in PENDING_APPROVAL.
+        await this.markRegistrationRejected(
+          domainId,
+          meta,
+          `No longer available at approval time`,
+        );
+        throw new BadRequestException(
+          `Domain ${domain.domainName} is no longer available — request rejected`,
+        );
       }
 
-      // 4. Register the domain via NameSilo
-      const ns = nameservers?.length ? nameservers : this.defaultNameservers;
+      const registrant = this.resolveRegistrantContact(
+        meta.registrantContact ?? undefined,
+        domain.user,
+      );
 
-      const regResponse = await this.nameSilo.registerDomain({
-        domain: domainName,
-        years: years || 1,
-        ns1: ns[0],
-        ns2: ns[1],
-        ns3: ns[2],
-        ns4: ns[3],
-        private: privacyProtection !== false, // WHOIS privacy is FREE on NameSilo, enable by default
-        autoRenew: autoRenew !== false,
-      });
+      attemptedRegistration = true;
+
+      let regResponse;
+      try {
+        regResponse = await this.nameSilo.registerDomain({
+          domain: domain.domainName,
+          years,
+          ns1: ns[0],
+          ns2: ns[1],
+          ns3: ns[2],
+          ns4: ns[3],
+          private: privacyProtection, // WHOIS privacy is FREE on NameSilo
+          autoRenew,
+        });
+      } catch (regErr) {
+        // Transport/timeout failure after the registrar call started. The domain
+        // MAY already be registered + charged. Leave the row in
+        // PENDING_REGISTRATION (NOT re-approvable) for manual reconciliation —
+        // never silently roll back and let an admin re-charge.
+        this.logger.error(
+          `NameSilo registerDomain failed for ${domain.domainName} after the charge window opened — LEFT in PENDING_REGISTRATION for manual reconciliation (a charge may have occurred): ${(regErr as any)?.message}`,
+        );
+        throw new ServiceUnavailableException(
+          `Registration for ${domain.domainName} could not be confirmed and is pending reconciliation. Do NOT retry — verify the domain in the NameSilo account first.`,
+        );
+      }
 
       if (!regResponse.success) {
+        // Registrar definitively refused → no charge → reject (leaves the queue).
+        await this.markRegistrationRejected(
+          domainId,
+          meta,
+          regResponse.message || 'NameSilo rejected the registration',
+        );
         throw new BadRequestException(
           `Domain registration failed: ${regResponse.message || 'Unknown error'}`,
         );
@@ -397,53 +570,130 @@ export class DomainService {
 
       const orderId = regResponse.orderId || `ns-${Date.now()}`;
 
-      // 5. Persist in local DB
-      const domain = await this.prisma.domain.create({
+      const updated = await this.prisma.domain.update({
+        where: { id: domainId },
         data: {
-          id: uuidv4(),
-          userId,
-          domainName,
-          tld,
-          rcOrderId: orderId, // Stores NameSilo order ID in the same field
           status: 'ACTIVE',
-          expiryDate: new Date(
-            Date.now() + (years || 1) * 365 * 24 * 60 * 60 * 1000,
-          ),
-          autoRenew: autoRenew !== false,
-          privacyProtection: privacyProtection !== false, // FREE on NameSilo
-          theftProtection: true, // Enabled by default
+          rcOrderId: orderId, // Stores NameSilo order ID in the same field
+          registrationDate: new Date(),
+          expiryDate: new Date(Date.now() + years * 365 * 24 * 60 * 60 * 1000),
+          autoRenew,
+          privacyProtection,
+          theftProtection: true,
           nameservers: ns,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         },
       });
 
-      // 6. Lock domain for theft protection
       try {
-        await this.nameSilo.lockDomain(domainName);
+        await this.nameSilo.lockDomain(domain.domainName);
       } catch {
         this.logger.warn(
-          `Could not enable theft protection for ${domainName} — may need to retry later`,
+          `Could not enable theft protection for ${domain.domainName} — may need to retry later`,
         );
       }
 
       this.logger.log(
-        `Domain ${domainName} registered via NameSilo (order: ${orderId})`,
+        `Domain ${domain.domainName} APPROVED + registered via NameSilo (order: ${orderId})`,
       );
 
       return {
-        id: domain.id,
-        domainName: domain.domainName,
+        id: updated.id,
+        domainName: updated.domainName,
         orderId,
-        status: 'active',
-        expiryDate: domain.expiryDate,
+        status: 'ACTIVE',
+        expiryDate: updated.expiryDate,
         nameservers: ns,
-        privacyProtection: domain.privacyProtection,
+        privacyProtection: updated.privacyProtection,
+        registrant,
         registrar: 'namesilo',
+        approved: true,
       };
     } catch (error) {
-      this.handleError(error, `registering domain ${domainName}`);
+      // Only auto-recover PRE-charge failures (e.g. the availability check threw a
+      // transport error before we ever called registerDomain): release the claim
+      // back to PENDING_APPROVAL so the admin can retry. Post-attempt failures have
+      // already set their own terminal/needs-review state and must NOT be rolled
+      // back — the conditional updateMany (status = PENDING_REGISTRATION) is a no-op
+      // for those because they already moved to REJECTED or stayed mid-flight.
+      if (!attemptedRegistration) {
+        await this.prisma.domain
+          .updateMany({
+            where: { id: domainId, status: 'PENDING_REGISTRATION' },
+            data: { status: 'PENDING_APPROVAL' },
+          })
+          .catch(() => undefined);
+      }
+      this.handleError(error, `approving domain ${domain.domainName}`);
     }
+  }
+
+  /** Move a claimed registration request to REJECTED, preserving requestMeta. */
+  private async markRegistrationRejected(
+    domainId: string,
+    meta: Record<string, any>,
+    reason: string,
+  ): Promise<void> {
+    await this.prisma.domain
+      .update({
+        where: { id: domainId },
+        data: {
+          status: 'REJECTED',
+          requestMeta: { ...meta, rejectionReason: reason, rejectedAt: new Date().toISOString() },
+        },
+      })
+      .catch(() => undefined);
+  }
+
+  /** SUPER_ADMIN rejects a pending domain registration request. */
+  async rejectDomainRegistration(
+    domainId: string,
+    reason?: string,
+  ): Promise<Record<string, unknown>> {
+    const domain = await this.prisma.domain.findUnique({ where: { id: domainId } });
+    if (!domain) throw new NotFoundException('Domain not found');
+    if (domain.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('This domain is not awaiting approval');
+    }
+    const meta = (domain.requestMeta as Record<string, any>) || {};
+    await this.prisma.domain.update({
+      where: { id: domainId },
+      data: {
+        status: 'REJECTED',
+        requestMeta: { ...meta, rejectionReason: reason ?? null, rejectedAt: new Date().toISOString() },
+      },
+    });
+    this.logger.log(
+      `Domain registration REJECTED: ${domain.domainName} (${reason || 'no reason given'})`,
+    );
+    return { id: domainId, domainName: domain.domainName, status: 'REJECTED' };
+  }
+
+  /**
+   * Resolve the registrant contact for a domain registration.
+   * Uses the supplied contact when present; otherwise derives a default from
+   * the requesting user's profile plus an env-configured default address.
+   */
+  private resolveRegistrantContact(
+    supplied: RegisterDomainDto['registrantContact'],
+    user: { name: string; email: string; companyName?: string | null; phone?: string | null },
+  ): Record<string, string> {
+    if (supplied) {
+      return { ...supplied };
+    }
+
+    return {
+      name: user.name,
+      company: user.companyName || user.name,
+      email: user.email,
+      phone:
+        user.phone ||
+        this.configService.get<string>('DEFAULT_REGISTRANT_PHONE', '+977-9800000000'),
+      address: this.configService.get<string>('DEFAULT_REGISTRANT_ADDRESS', 'Kathmandu'),
+      city: this.configService.get<string>('DEFAULT_REGISTRANT_CITY', 'Kathmandu'),
+      state: this.configService.get<string>('DEFAULT_REGISTRANT_STATE', 'Bagmati'),
+      country: this.configService.get<string>('DEFAULT_REGISTRANT_COUNTRY', 'NP'),
+      zip: this.configService.get<string>('DEFAULT_REGISTRANT_ZIP', '44600'),
+    };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -625,11 +875,29 @@ export class DomainService {
    * Get all DNS records for a domain.
    * Uses NameSilo as primary, falls back to ResellerClub for legacy domains.
    */
+  /**
+   * Domains whose nameservers point to Cloudflare are managed via the Cloudflare
+   * API (NameSilo is no longer authoritative for them). Falls back to NameSilo
+   * when CF isn't configured or the domain isn't on Cloudflare.
+   */
+  private useCloudflare(nameservers: unknown): boolean {
+    return (
+      this.cloudflareDns.isConfigured() &&
+      CloudflareDnsService.isCloudflareNameservers(nameservers)
+    );
+  }
+
   async getDnsRecords(
     domainId: string,
     userId: string,
   ): Promise<DnsRecord[]> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      this.logger.debug(`Fetching DNS records from Cloudflare for ${domain.domainName}`);
+
+      return this.cloudflareDns.listRecords(domain.domainName);
+    }
 
     try {
       // Primary: NameSilo
@@ -683,6 +951,18 @@ export class DomainService {
     dto: AddDnsRecordDto,
   ): Promise<{ success: boolean; message: string }> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      await this.cloudflareDns.createRecord(domain.domainName, {
+        type: dto.type,
+        host: dto.host,
+        value: dto.value,
+        ttl: dto.ttl,
+        priority: dto.priority,
+      });
+
+      return { success: true, message: `${dto.type} record added via Cloudflare` };
+    }
 
     // NameSilo uses subdomain-only host (e.g. "www" not "www.domain.com")
     const host = dto.host.replace(`.${domain.domainName}`, '').replace(/\.$/, '');
@@ -742,6 +1022,18 @@ export class DomainService {
     dto: UpdateDnsRecordDto,
   ): Promise<{ success: boolean; message: string }> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      await this.cloudflareDns.updateRecord(domain.domainName, recordId, {
+        type: dto.type,
+        host: dto.host,
+        value: dto.value,
+        ttl: dto.ttl,
+        priority: dto.priority,
+      });
+
+      return { success: true, message: 'DNS record updated via Cloudflare' };
+    }
 
     // NameSilo uses subdomain-only host (e.g. "www" not "www.domain.com")
     const host = dto.host
@@ -808,6 +1100,12 @@ export class DomainService {
     recordId: string,
   ): Promise<{ success: boolean; message: string }> {
     const domain = await this.findDomainOrFail(domainId, userId);
+
+    if (this.useCloudflare(domain.nameservers)) {
+      await this.cloudflareDns.deleteRecord(domain.domainName, recordId);
+
+      return { success: true, message: 'DNS record deleted via Cloudflare' };
+    }
 
     try {
       // Primary: NameSilo — recordId is the NameSilo record_id
@@ -1673,6 +1971,15 @@ export class DomainService {
       }
     }
 
+    // Persist DNS-hosting state in the 'dns_hosting' settings store. This is the
+    // single source of truth that disableDnsHosting removes from and
+    // listDnsHostingDomains reads — so enable/disable/list stay consistent.
+    await this.saveDomainSetting(userId, 'dns_hosting', domainId, {
+      domainId,
+      domainName: domain.domainName,
+      enabledAt: new Date().toISOString(),
+    });
+
     await this.logActivity(userId, 'DNS_HOSTING_ENABLED', 'Domain', domainId, {
       domainName: domain.domainName,
     });
@@ -1683,21 +1990,28 @@ export class DomainService {
   }
 
   /**
-   * List domains that have DNS hosting enabled (domains using our nameservers).
+   * List the user's domains annotated with their DNS-hosting state.
+   * Driven by the 'dns_hosting' settings store (the same store that
+   * enableDnsHosting writes and disableDnsHosting removes), so the toggle state
+   * shown here always matches what enable/disable have recorded.
    */
   async listDnsHostingDomains(userId: string): Promise<unknown[]> {
-    // Domains using our default nameservers have DNS hosting enabled
-    const domains = await this.prisma.domain.findMany({
-      where: { userId, status: 'ACTIVE' },
-    });
+    const [domains, enabledStore] = await Promise.all([
+      this.prisma.domain.findMany({
+        where: { userId, status: 'ACTIVE' },
+      }),
+      this.getDomainSettings(userId, 'dns_hosting'),
+    ]);
 
-    // Filter domains using our nameservers
-    return domains.filter((d) => {
-      const ns = d.nameservers as string[] | null;
-      if (!ns || !Array.isArray(ns)) return false;
-      return ns.some((n: string) =>
-        this.defaultNameservers.some((dns) => n.toLowerCase() === dns.toLowerCase()),
-      );
+    return domains.map((d) => {
+      const records = d.nameservers as string[] | null;
+      return {
+        id: d.id,
+        name: d.domainName,
+        status: d.status,
+        records: Array.isArray(records) ? records.length : 0,
+        dnsHostingEnabled: Object.prototype.hasOwnProperty.call(enabledStore, d.id),
+      };
     });
   }
 
@@ -1957,6 +2271,83 @@ export class DomainService {
     return this.prisma.domain.findMany({
       where: { userId, id: { in: parkedIds } },
     });
+  }
+
+  // ── List endpoints for persisted service requests (settings-store backed) ──
+  // requestDomainBroker / requestNegotiation / preRegisterDomain persist to the
+  // domain settings store; these expose the saved records to their list pages.
+  async listBrokerRequests(userId: string): Promise<unknown[]> {
+    return Object.values(await this.getDomainSettings(userId, 'broker_requests'));
+  }
+
+  async listNegotiations(userId: string): Promise<unknown[]> {
+    return Object.values(await this.getDomainSettings(userId, 'negotiation_requests'));
+  }
+
+  async listPreRegistrations(userId: string): Promise<unknown[]> {
+    return Object.values(await this.getDomainSettings(userId, 'pre_registrations'));
+  }
+
+  /**
+   * Disable DNS hosting for a domain (counterpart to enableDnsHosting).
+   */
+  async disableDnsHosting(
+    domainId: string,
+    userId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const domain = await this.findDomainOrFail(domainId, userId);
+
+    await this.removeDomainSetting(userId, 'dns_hosting', domainId);
+    await this.logActivity(userId, 'DISABLE_DNS_HOSTING', 'Domain', domainId, {
+      domainName: domain.domainName,
+    });
+
+    return { success: true, message: `DNS hosting disabled for ${domain.domainName}` };
+  }
+
+  // ── Afternic marketplace connection (settings-store backed) ──
+  async getAfternicStatus(userId: string): Promise<{ connected: boolean; connectedAt?: string }> {
+    const settings = await this.getDomainSettings(userId, 'afternic');
+    const status = settings['status'] as { connected?: boolean; connectedAt?: string } | undefined;
+
+    return { connected: !!status?.connected, connectedAt: status?.connectedAt };
+  }
+
+  async connectAfternic(userId: string): Promise<{ connected: boolean; connectedAt: string }> {
+    const connectedAt = new Date().toISOString();
+
+    await this.saveDomainSetting(userId, 'afternic', 'status', { connected: true, connectedAt });
+    await this.logActivity(userId, 'CONNECT_AFTERNIC', 'Domain', 'afternic', {});
+
+    return { connected: true, connectedAt };
+  }
+
+  /**
+   * Place a bid on a domain auction (records the bid in the settings store).
+   */
+  async placeAuctionBid(
+    auctionId: string,
+    userId: string,
+    amount: number,
+  ): Promise<{ success: boolean; auctionId: string; amount: number }> {
+    if (!auctionId?.trim()) {
+      throw new BadRequestException('auctionId is required');
+    }
+    // Guard against NaN / zero / negative bids (defense-in-depth on top of the
+    // DTO's @Min(1)). The 'auctions' store is a stub today, so we cannot verify
+    // the auction exists / is open without rejecting every bid; the amount guard
+    // is the minimum safe check.
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Bid amount must be a positive number');
+    }
+    await this.saveDomainSetting(userId, 'auction_bids', auctionId, {
+      auctionId,
+      amount,
+      bidAt: new Date().toISOString(),
+    });
+    await this.logActivity(userId, 'PLACE_AUCTION_BID', 'Domain', auctionId, { amount });
+
+    return { success: true, auctionId, amount };
   }
 
   /**
@@ -2440,8 +2831,9 @@ export class DomainService {
   private async getDomainSettings(
     userId: string,
     category: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<Record<string, unknown>> {
-    const log = await this.prisma.activityLog.findFirst({
+    const log = await client.activityLog.findFirst({
       where: {
         userId,
         action: 'DOMAIN_SETTINGS_STORE',
@@ -2456,6 +2848,10 @@ export class DomainService {
 
   /**
    * Save a domain setting entry.
+   *
+   * The read-modify-write (read existing → deleteMany → create) is wrapped in a
+   * Serializable transaction so concurrent writes to the same userId+category
+   * can't read the same base snapshot and drop each other's entries.
    */
   private async saveDomainSetting(
     userId: string,
@@ -2463,29 +2859,34 @@ export class DomainService {
     key: string,
     value: unknown,
   ): Promise<void> {
-    const existing = await this.getDomainSettings(userId, category);
-    existing[key] = value;
+    await this.prisma.$transaction(
+      async (tx) => {
+        const existing = await this.getDomainSettings(userId, category, tx);
+        existing[key] = value;
 
-    // Delete old settings record for this category
-    await this.prisma.activityLog.deleteMany({
-      where: {
-        userId,
-        action: 'DOMAIN_SETTINGS_STORE',
-        resourceType: category,
-      },
-    });
+        // Delete old settings record for this category
+        await tx.activityLog.deleteMany({
+          where: {
+            userId,
+            action: 'DOMAIN_SETTINGS_STORE',
+            resourceType: category,
+          },
+        });
 
-    // Create new settings record
-    await this.prisma.activityLog.create({
-      data: {
-        id: uuidv4(),
-        userId,
-        action: 'DOMAIN_SETTINGS_STORE',
-        resourceType: category,
-        details: existing as any,
-        createdAt: new Date(),
+        // Create new settings record
+        await tx.activityLog.create({
+          data: {
+            id: uuidv4(),
+            userId,
+            action: 'DOMAIN_SETTINGS_STORE',
+            resourceType: category,
+            details: existing as any,
+            createdAt: new Date(),
+          },
+        });
       },
-    });
+      { isolationLevel: 'Serializable' },
+    );
   }
 
   /**
@@ -2496,29 +2897,34 @@ export class DomainService {
     category: string,
     key: string,
   ): Promise<void> {
-    const existing = await this.getDomainSettings(userId, category);
-    delete existing[key];
+    await this.prisma.$transaction(
+      async (tx) => {
+        const existing = await this.getDomainSettings(userId, category, tx);
+        delete existing[key];
 
-    await this.prisma.activityLog.deleteMany({
-      where: {
-        userId,
-        action: 'DOMAIN_SETTINGS_STORE',
-        resourceType: category,
+        await tx.activityLog.deleteMany({
+          where: {
+            userId,
+            action: 'DOMAIN_SETTINGS_STORE',
+            resourceType: category,
+          },
+        });
+
+        if (Object.keys(existing).length > 0) {
+          await tx.activityLog.create({
+            data: {
+              id: uuidv4(),
+              userId,
+              action: 'DOMAIN_SETTINGS_STORE',
+              resourceType: category,
+              details: existing as any,
+              createdAt: new Date(),
+            },
+          });
+        }
       },
-    });
-
-    if (Object.keys(existing).length > 0) {
-      await this.prisma.activityLog.create({
-        data: {
-          id: uuidv4(),
-          userId,
-          action: 'DOMAIN_SETTINGS_STORE',
-          resourceType: category,
-          details: existing as any,
-          createdAt: new Date(),
-        },
-      });
-    }
+      { isolationLevel: 'Serializable' },
+    );
   }
 
   /**
