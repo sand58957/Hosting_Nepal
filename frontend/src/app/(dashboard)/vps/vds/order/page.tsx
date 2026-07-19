@@ -104,11 +104,11 @@ const VDSOrderPage = () => {
         setPlans(vdsPlans)
       } catch {
         setPlans([
-          { id: 'vds-s', name: 'VDS S', cpu: 3, ram: 24, disk: 180, bandwidth: '250 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 8631, priceYearly: 86310 },
-          { id: 'vds-m', name: 'VDS M', cpu: 4, ram: 32, disk: 240, bandwidth: '500 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 10268, priceYearly: 102680, popular: true },
-          { id: 'vds-l', name: 'VDS L', cpu: 6, ram: 48, disk: 360, bandwidth: '750 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 15476, priceYearly: 154760 },
-          { id: 'vds-xl', name: 'VDS XL', cpu: 8, ram: 64, disk: 480, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 20535, priceYearly: 205350 },
-          { id: 'vds-xxl', name: 'VDS XXL', cpu: 12, ram: 96, disk: 720, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 29016, priceYearly: 290160 },
+          { id: 'vds-s', name: 'VDS S', cpu: 6, ram: 24, disk: 180, bandwidth: '250 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 8742, priceYearly: 87420 },
+          { id: 'vds-m', name: 'VDS M', cpu: 8, ram: 32, disk: 240, bandwidth: '500 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 10974, priceYearly: 109740, popular: true },
+          { id: 'vds-l', name: 'VDS L', cpu: 12, ram: 48, disk: 360, bandwidth: '750 Mbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 15438, priceYearly: 154380 },
+          { id: 'vds-xl', name: 'VDS XL', cpu: 16, ram: 64, disk: 480, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 21018, priceYearly: 210180 },
+          { id: 'vds-xxl', name: 'VDS XXL', cpu: 24, ram: 96, disk: 720, bandwidth: '1 Gbit/s', processor: 'AMD EPYC 7282 2.8 GHz', price: 31062, priceYearly: 310620 },
         ])
       } finally {
         setLoadingPlans(false)

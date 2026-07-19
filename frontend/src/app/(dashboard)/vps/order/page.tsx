@@ -84,14 +84,14 @@ const VPSOrderPage = () => {
         const allPlans = res.data?.data ?? res.data
         const raw = Array.isArray(allPlans) ? allPlans : allPlans?.data ?? []
 
-        // Contabo Cloud VPS specs (NVMe / SSD disk, snapshots, port)
+        // Contabo Cloud VPS 4-18 specs (SSD disk, snapshots, port) — 2026 lineup
         const contaboSpecs: Record<string, { diskSsd: number; snapshots: number; bandwidth: string }> = {
-          'vps-10': { diskSsd: 150, snapshots: 1, bandwidth: '200 Mbit/s' },
-          'vps-20': { diskSsd: 200, snapshots: 2, bandwidth: '300 Mbit/s' },
-          'vps-30': { diskSsd: 400, snapshots: 3, bandwidth: '600 Mbit/s' },
-          'vps-40': { diskSsd: 500, snapshots: 3, bandwidth: '800 Mbit/s' },
-          'vps-50': { diskSsd: 600, snapshots: 3, bandwidth: '1 Gbit/s' },
-          'vps-60': { diskSsd: 700, snapshots: 3, bandwidth: '1 Gbit/s' },
+          'vps-10': { diskSsd: 0, snapshots: 1, bandwidth: '200 Mbit/s' },
+          'vps-20': { diskSsd: 0, snapshots: 2, bandwidth: '300 Mbit/s' },
+          'vps-30': { diskSsd: 0, snapshots: 3, bandwidth: '600 Mbit/s' },
+          'vps-40': { diskSsd: 0, snapshots: 3, bandwidth: '800 Mbit/s' },
+          'vps-50': { diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s' },
+          'vps-60': { diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s' },
         }
         // Storage VPS specs (SSD-only, storage-optimised)
         const storageSpecs: Record<string, { snapshots: number; bandwidth: string }> = {
@@ -111,7 +111,7 @@ const VPSOrderPage = () => {
               cpu: p.specs?.cpuCores || 0,
               ram: p.specs?.ramGB || 0,
               disk: p.specs?.diskGB || 0,
-              diskSsd: extra.diskSsd || (p.specs?.diskGB || 0) * 2,
+              diskSsd: extra.diskSsd ?? 0,
               snapshots: extra.snapshots || 1,
               bandwidth: extra.bandwidth || '200 Mbit/s',
               price: p.priceMonthly,
@@ -148,12 +148,12 @@ const VPSOrderPage = () => {
         setStoragePlans(storageVpsPlans)
       } catch {
         setPlans([
-          { id: 'vps-10', name: 'VPS 10', cpu: 4, ram: 8, disk: 75, diskSsd: 150, snapshots: 1, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280 },
-          { id: 'vps-20', name: 'VPS 20', cpu: 6, ram: 12, disk: 100, diskSsd: 200, snapshots: 2, bandwidth: '300 Mbit/s', price: 1674, priceYearly: 16740, popular: true },
-          { id: 'vps-30', name: 'VPS 30', cpu: 8, ram: 24, disk: 200, diskSsd: 400, snapshots: 3, bandwidth: '600 Mbit/s', price: 3125, priceYearly: 31250 },
-          { id: 'vps-40', name: 'VPS 40', cpu: 12, ram: 48, disk: 250, diskSsd: 500, snapshots: 3, bandwidth: '800 Mbit/s', price: 5580, priceYearly: 55800 },
-          { id: 'vps-50', name: 'VPS 50', cpu: 16, ram: 64, disk: 300, diskSsd: 600, snapshots: 3, bandwidth: '1 Gbit/s', price: 8277, priceYearly: 82770 },
-          { id: 'vps-60', name: 'VPS 60', cpu: 18, ram: 96, disk: 350, diskSsd: 700, snapshots: 3, bandwidth: '1 Gbit/s', price: 10937, priceYearly: 109370 },
+          { id: 'vps-10', name: 'VPS 4', cpu: 4, ram: 8, disk: 100, diskSsd: 0, snapshots: 1, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280 },
+          { id: 'vps-20', name: 'VPS 6', cpu: 6, ram: 12, disk: 200, diskSsd: 0, snapshots: 2, bandwidth: '300 Mbit/s', price: 1674, priceYearly: 16740, popular: true },
+          { id: 'vps-30', name: 'VPS 8', cpu: 8, ram: 24, disk: 300, diskSsd: 0, snapshots: 3, bandwidth: '600 Mbit/s', price: 3125, priceYearly: 31250 },
+          { id: 'vps-40', name: 'VPS 12', cpu: 12, ram: 48, disk: 400, diskSsd: 0, snapshots: 3, bandwidth: '800 Mbit/s', price: 5580, priceYearly: 55800 },
+          { id: 'vps-50', name: 'VPS 16', cpu: 16, ram: 64, disk: 500, diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s', price: 8277, priceYearly: 82770 },
+          { id: 'vps-60', name: 'VPS 18', cpu: 18, ram: 96, disk: 600, diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s', price: 10937, priceYearly: 109370 },
         ])
         setStoragePlans([
           { id: 'storage-vps-10', name: 'Storage VPS 10', cpu: 2, ram: 4, disk: 300, diskSsd: 0, snapshots: 0, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280, isStorage: true },
@@ -241,9 +241,7 @@ const VPSOrderPage = () => {
             {[
               { icon: 'tabler-cpu', label: `${plan.cpu} vCPU Cores`, sub: undefined as string | undefined },
               { icon: 'tabler-device-desktop-analytics', label: `${plan.ram} GB RAM`, sub: undefined as string | undefined },
-              plan.isStorage
-                ? { icon: 'tabler-database', label: `${plan.disk} GB SSD`, sub: undefined as string | undefined }
-                : { icon: 'tabler-database', label: `${plan.disk} GB NVMe`, sub: plan.diskSsd ? `or ${plan.diskSsd} GB SSD` : undefined },
+              { icon: 'tabler-database', label: `${plan.disk} GB SSD`, sub: undefined as string | undefined },
               { icon: 'tabler-camera', label: `${plan.snapshots ?? 0} Snapshot${(plan.snapshots ?? 0) === 1 ? '' : 's'}`, sub: undefined as string | undefined },
               { icon: 'tabler-network', label: `${plan.bandwidth || '200 Mbit/s'} Port`, sub: undefined as string | undefined },
               { icon: 'tabler-transfer', label: 'Unlimited Traffic', sub: undefined as string | undefined },

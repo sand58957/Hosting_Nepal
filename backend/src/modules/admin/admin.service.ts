@@ -68,7 +68,7 @@ export class AdminService {
     const results = {
       vpsProvisioned: await this.mail.sendVpsProvisioned(user, {
         displayName: 'Digital Nepal',
-        planName: 'VPS 10',
+        planName: 'VPS 4',
         ipAddress: '13.140.162.144',
         ipv6: '2a02:c207:2336:1939::1',
         location: 'Hub Europe (EU)',
@@ -78,17 +78,17 @@ export class AdminService {
       paymentReminder: await this.mail.sendPaymentReminder(user, {
         totalDueNpr: 1066,
         daysLeft: 5,
-        services: [{ name: 'VPS 10 — Digital Nepal', paidUntil: '2026-07-09', amountNpr: 1066 }],
+        services: [{ name: 'VPS 4 — Digital Nepal', paidUntil: '2026-07-09', amountNpr: 1066 }],
       }),
       suspensionWarning: await this.mail.sendSuspensionWarning(user, {
         totalDueNpr: 1066,
         graceDays: 4,
         reactivationFeeNpr: 1000,
-        services: [{ name: 'VPS 10 — Digital Nepal', paidUntil: '2026-06-06', amountNpr: 1066 }],
+        services: [{ name: 'VPS 4 — Digital Nepal', paidUntil: '2026-06-06', amountNpr: 1066 }],
       }),
       cancellation: await this.mail.sendServiceCancelled(user, {
-        serviceName: 'VPS 10 — Digital Nepal',
-        planName: 'VPS 10',
+        serviceName: 'VPS 4 — Digital Nepal',
+        planName: 'VPS 4',
         endsOn: '2026-07-09',
         reason: 'Cancelled at customer request',
       }),
@@ -97,7 +97,7 @@ export class AdminService {
         method: 'Email & password',
       }),
       vpsRequestReceived: await this.mail.sendVpsRequestReceived(user, {
-        planName: 'VPS 10',
+        planName: 'VPS 4',
         hostname: 'Digital Nepal',
       }),
       upgradeApplied: await this.mail.sendVpsUpgradeApplied(user, {
@@ -112,7 +112,7 @@ export class AdminService {
       adminVpsAlert: await this.mail.sendAdminVpsRequestAlert({
         customerName: 'Aditya Raj Group',
         customerEmail: 'adityarajgroup.ai@gmail.com',
-        planName: 'VPS 10',
+        planName: 'VPS 4',
         hostname: 'Digital Nepal',
         isFree: true,
       }),
