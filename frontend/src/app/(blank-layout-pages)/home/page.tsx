@@ -110,7 +110,7 @@ const fallbackPlans: Plan[] = [
   { id: 'vps-50', name: 'Cloud VPS 16', type: 'VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 500, cpuCores: 16, ramGB: 64 }, },
   { id: 'vps-60', name: 'Cloud VPS 18', type: 'VPS', priceMonthly: 10937, priceYearly: 109370, currency: 'NPR', features: [], specs: { diskGB: 600, cpuCores: 18, ramGB: 96 }, },
   { id: 'vps-plus-4', name: 'Cloud VPS Plus 4', type: 'VPS_PLUS', priceMonthly: 3023, priceYearly: 30230, currency: 'NPR', features: [], specs: { diskGB: 150, cpuCores: 4, ramGB: 8 }, },
-  { id: 'vps-plus-6', name: 'Cloud VPS Plus 6', type: 'VPS_PLUS', priceMonthly: 4278, priceYearly: 42780, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 6, ramGB: 12 }, popular: true },
+  { id: 'vps-plus-6', name: 'Cloud VPS Plus 6', type: 'VPS_PLUS', priceMonthly: 4279, priceYearly: 42790, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 6, ramGB: 12 }, popular: true },
   { id: 'vps-plus-8', name: 'Cloud VPS Plus 8', type: 'VPS_PLUS', priceMonthly: 7812, priceYearly: 78120, currency: 'NPR', features: [], specs: { diskGB: 450, cpuCores: 8, ramGB: 24 }, },
   { id: 'vps-plus-12', name: 'Cloud VPS Plus 12', type: 'VPS_PLUS', priceMonthly: 13206, priceYearly: 132060, currency: 'NPR', features: [], specs: { diskGB: 600, cpuCores: 12, ramGB: 48 }, },
   { id: 'vps-plus-16', name: 'Cloud VPS Plus 16', type: 'VPS_PLUS', priceMonthly: 17670, priceYearly: 176700, currency: 'NPR', features: [], specs: { diskGB: 750, cpuCores: 16, ramGB: 64 }, },

@@ -192,7 +192,7 @@ const VPSOrderPage = () => {
         ])
         setPlusPlans([
           { id: 'vps-plus-4', name: 'Cloud VPS Plus 4', cpu: 4, ram: 8, disk: 150, diskSsd: 0, diskType: 'NVMe', snapshots: 1, bandwidth: '500 Mbit/s', price: 3023, priceYearly: 30230 },
-          { id: 'vps-plus-6', name: 'Cloud VPS Plus 6', cpu: 6, ram: 12, disk: 300, diskSsd: 0, diskType: 'NVMe', snapshots: 2, bandwidth: '500 Mbit/s', price: 4278, priceYearly: 42780, popular: true },
+          { id: 'vps-plus-6', name: 'Cloud VPS Plus 6', cpu: 6, ram: 12, disk: 300, diskSsd: 0, diskType: 'NVMe', snapshots: 2, bandwidth: '500 Mbit/s', price: 4279, priceYearly: 42790, popular: true },
           { id: 'vps-plus-8', name: 'Cloud VPS Plus 8', cpu: 8, ram: 24, disk: 450, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 7812, priceYearly: 78120 },
           { id: 'vps-plus-12', name: 'Cloud VPS Plus 12', cpu: 12, ram: 48, disk: 600, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 13206, priceYearly: 132060 },
           { id: 'vps-plus-16', name: 'Cloud VPS Plus 16', cpu: 16, ram: 64, disk: 750, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 17670, priceYearly: 176700 },
