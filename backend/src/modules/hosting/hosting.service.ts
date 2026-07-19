@@ -61,12 +61,19 @@ const CONTABO_PRODUCT_MAP: Record<string, { contaboProductId: string; name: stri
   // HN plan id -> real Contabo product id (SSD variant, from GET /v1/products).
   // 2026 lineup: Cloud VPS 4-18 = V153-V158 (renamed from Cloud VPS 10-60 = V92/V95/V98/V101/V104/V107,
   // same list prices); Cloud VDS S–XXL = V8/V9/V10/V11/V16.
-  'vps-10': { contaboProductId: 'V153', name: 'VPS 4' }, // Cloud VPS 4 (4c/8GB/100GB SSD)
-  'vps-20': { contaboProductId: 'V154', name: 'VPS 6' }, // Cloud VPS 6 (6c/12GB/200GB SSD)
-  'vps-30': { contaboProductId: 'V155', name: 'VPS 8' }, // Cloud VPS 8 (8c/24GB/300GB SSD)
-  'vps-40': { contaboProductId: 'V156', name: 'VPS 12' }, // Cloud VPS 12 (12c/48GB/400GB SSD)
-  'vps-50': { contaboProductId: 'V157', name: 'VPS 16' }, // Cloud VPS 16 (16c/64GB/500GB SSD)
-  'vps-60': { contaboProductId: 'V158', name: 'VPS 18' }, // Cloud VPS 18 (18c/96GB/600GB SSD)
+  'vps-10': { contaboProductId: 'V153', name: 'Cloud VPS 4' }, // Core VPS (4c/8GB/100GB SSD)
+  'vps-20': { contaboProductId: 'V154', name: 'Cloud VPS 6' }, // Core VPS (6c/12GB/200GB SSD)
+  'vps-30': { contaboProductId: 'V155', name: 'Cloud VPS 8' }, // Core VPS (8c/24GB/300GB SSD)
+  'vps-40': { contaboProductId: 'V156', name: 'Cloud VPS 12' }, // Core VPS (12c/48GB/400GB SSD)
+  'vps-50': { contaboProductId: 'V157', name: 'Cloud VPS 16' }, // Core VPS (16c/64GB/500GB SSD)
+  'vps-60': { contaboProductId: 'V158', name: 'Cloud VPS 18' }, // Core VPS (18c/96GB/600GB SSD)
+  // Performance VPS (Cloud VPS Plus, NVMe) — V159-V164.
+  'vps-plus-4': { contaboProductId: 'V159', name: 'Cloud VPS Plus 4' }, // 4c/8GB/150GB NVMe
+  'vps-plus-6': { contaboProductId: 'V160', name: 'Cloud VPS Plus 6' }, // 6c/12GB/300GB NVMe
+  'vps-plus-8': { contaboProductId: 'V161', name: 'Cloud VPS Plus 8' }, // 8c/24GB/450GB NVMe
+  'vps-plus-12': { contaboProductId: 'V162', name: 'Cloud VPS Plus 12' }, // 12c/48GB/600GB NVMe
+  'vps-plus-16': { contaboProductId: 'V163', name: 'Cloud VPS Plus 16' }, // 16c/64GB/750GB NVMe
+  'vps-plus-18': { contaboProductId: 'V164', name: 'Cloud VPS Plus 18' }, // 18c/96GB/900GB NVMe
   // Storage VPS (SSD, storage-optimised) — verified via GET /v1/products.
   'storage-vps-10': { contaboProductId: 'V93', name: 'Storage VPS 10' }, // 2c/4GB/300GB SSD
   'storage-vps-30': { contaboProductId: 'V99', name: 'Storage VPS 30' }, // 6c/18GB/1TB SSD
@@ -282,7 +289,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   // ── VPS (Contabo) ───────────────────────────────────────────────────────────
   {
     id: 'vps-10',
-    name: 'VPS 4',
+    name: 'Cloud VPS 4',
     type: 'VPS',
     specs: {
       diskGB: 100,
@@ -310,7 +317,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vps-20',
-    name: 'VPS 6',
+    name: 'Cloud VPS 6',
     type: 'VPS',
     specs: {
       diskGB: 200,
@@ -339,7 +346,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vps-30',
-    name: 'VPS 8',
+    name: 'Cloud VPS 8',
     type: 'VPS',
     specs: {
       diskGB: 300,
@@ -367,7 +374,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vps-40',
-    name: 'VPS 12',
+    name: 'Cloud VPS 12',
     type: 'VPS',
     specs: {
       diskGB: 400,
@@ -395,7 +402,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vps-50',
-    name: 'VPS 16',
+    name: 'Cloud VPS 16',
     type: 'VPS',
     specs: {
       diskGB: 500,
@@ -423,7 +430,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vps-60',
-    name: 'VPS 18',
+    name: 'Cloud VPS 18',
     type: 'VPS',
     specs: {
       diskGB: 600,
@@ -448,6 +455,68 @@ const HOSTING_PLANS: HostingPlan[] = [
       'DDoS Protection',
       'Contabo Cloud',
     ],
+  },
+  // ── Performance VPS (Contabo Cloud VPS Plus, AMD EPYC + NVMe) ───────────────
+  {
+    id: 'vps-plus-4',
+    name: 'Cloud VPS Plus 4',
+    type: 'VPS_PLUS',
+    specs: { diskGB: 150, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 4, ramGB: 8 },
+    priceMonthly: applyContaboUsd(16.25), // Contabo Cloud VPS Plus 4 (V159) 12-mo $13.00 → NPR 3023
+    priceYearly: applyContaboUsd(16.25) * 10,
+    currency: 'NPR',
+    features: ['4 vCPU (AMD EPYC)', '8 GB RAM', '150 GB NVMe', '500 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+  },
+  {
+    id: 'vps-plus-6',
+    name: 'Cloud VPS Plus 6',
+    type: 'VPS_PLUS',
+    specs: { diskGB: 300, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 6, ramGB: 12 },
+    priceMonthly: applyContaboUsd(23.00), // Contabo Cloud VPS Plus 6 (V160) 12-mo $18.40 → NPR 4278
+    priceYearly: applyContaboUsd(23.00) * 10,
+    currency: 'NPR',
+    features: ['6 vCPU (AMD EPYC)', '12 GB RAM', '300 GB NVMe', '500 Mbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+    popular: true,
+  },
+  {
+    id: 'vps-plus-8',
+    name: 'Cloud VPS Plus 8',
+    type: 'VPS_PLUS',
+    specs: { diskGB: 450, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 8, ramGB: 24 },
+    priceMonthly: applyContaboUsd(42.00), // Contabo Cloud VPS Plus 8 (V161) 12-mo $33.60 → NPR 7812
+    priceYearly: applyContaboUsd(42.00) * 10,
+    currency: 'NPR',
+    features: ['8 vCPU (AMD EPYC)', '24 GB RAM', '450 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+  },
+  {
+    id: 'vps-plus-12',
+    name: 'Cloud VPS Plus 12',
+    type: 'VPS_PLUS',
+    specs: { diskGB: 600, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 12, ramGB: 48 },
+    priceMonthly: applyContaboUsd(71.00), // Contabo Cloud VPS Plus 12 (V162) 12-mo $56.80 → NPR 13206
+    priceYearly: applyContaboUsd(71.00) * 10,
+    currency: 'NPR',
+    features: ['12 vCPU (AMD EPYC)', '48 GB RAM', '600 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+  },
+  {
+    id: 'vps-plus-16',
+    name: 'Cloud VPS Plus 16',
+    type: 'VPS_PLUS',
+    specs: { diskGB: 750, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 16, ramGB: 64 },
+    priceMonthly: applyContaboUsd(95.00), // Contabo Cloud VPS Plus 16 (V163) 12-mo $76.00 → NPR 17670
+    priceYearly: applyContaboUsd(95.00) * 10,
+    currency: 'NPR',
+    features: ['16 vCPU (AMD EPYC)', '64 GB RAM', '750 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
+  },
+  {
+    id: 'vps-plus-18',
+    name: 'Cloud VPS Plus 18',
+    type: 'VPS_PLUS',
+    specs: { diskGB: 900, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 18, ramGB: 96 },
+    priceMonthly: applyContaboUsd(119.00), // Contabo Cloud VPS Plus 18 (V164) 12-mo $95.20 → NPR 22134
+    priceYearly: applyContaboUsd(119.00) * 10,
+    currency: 'NPR',
+    features: ['18 vCPU (AMD EPYC)', '96 GB RAM', '900 GB NVMe', '1 Gbit/s Bandwidth', '1 Dedicated IPv4', 'Full Root Access', 'KVM Virtualization', 'DDoS Protection', 'Contabo Cloud'],
   },
   // ── Storage VPS (Contabo) ───────────────────────────────────────────────────
   {
@@ -565,7 +634,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   // ── VDS (Contabo Dedicated) ─────────────────────────────────────────────────
   {
     id: 'vds-s',
-    name: 'VDS S',
+    name: 'Cloud VDS S',
     type: 'VDS',
     specs: { diskGB: 180, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 6, ramGB: 24 },
     priceMonthly: applyContaboUsd(47.00), // Contabo Cloud VDS S 12-mo $37.60 → NPR 8742
@@ -575,7 +644,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vds-m',
-    name: 'VDS M',
+    name: 'Cloud VDS M',
     type: 'VDS',
     specs: { diskGB: 240, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 8, ramGB: 32 },
     priceMonthly: applyContaboUsd(59.00), // Contabo Cloud VDS M 12-mo $47.20 → NPR 10974
@@ -586,7 +655,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vds-l',
-    name: 'VDS L',
+    name: 'Cloud VDS L',
     type: 'VDS',
     specs: { diskGB: 360, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 12, ramGB: 48 },
     priceMonthly: applyContaboUsd(83.00), // Contabo Cloud VDS L 12-mo $66.40 → NPR 15438
@@ -596,7 +665,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vds-xl',
-    name: 'VDS XL',
+    name: 'Cloud VDS XL',
     type: 'VDS',
     specs: { diskGB: 480, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 16, ramGB: 64 },
     priceMonthly: applyContaboUsd(113.00), // Contabo Cloud VDS XL 12-mo $90.40 → NPR 21018
@@ -606,7 +675,7 @@ const HOSTING_PLANS: HostingPlan[] = [
   },
   {
     id: 'vds-xxl',
-    name: 'VDS XXL',
+    name: 'Cloud VDS XXL',
     type: 'VDS',
     specs: { diskGB: 720, bandwidthGB: -1, emailAccounts: 0, subdomains: 0, databases: 0, cpuCores: 24, ramGB: 96 },
     priceMonthly: applyContaboUsd(167.00), // Contabo Cloud VDS XXL 12-mo $133.60 → NPR 31062
@@ -1917,7 +1986,7 @@ export class HostingService implements OnModuleInit {
     const plan = HOSTING_PLANS.find(
       (p) =>
         p.id === dto.planId &&
-        (p.type === 'VPS' || p.type === 'VDS' || p.type === 'STORAGE_VPS'),
+        (p.type === 'VPS' || p.type === 'VPS_PLUS' || p.type === 'VDS' || p.type === 'STORAGE_VPS'),
     );
     if (!plan) {
       throw new BadRequestException(`VPS plan '${dto.planId}' not found`);
@@ -2830,7 +2899,7 @@ export class HostingService implements OnModuleInit {
     const hosting = await this.findVpsOwnedByUser(id, userId);
 
     const newPlan = HOSTING_PLANS.find(
-      (p) => p.id === dto.newPlanId && (p.type === 'VPS' || p.type === 'VDS'),
+      (p) => p.id === dto.newPlanId && (p.type === 'VPS' || p.type === 'VPS_PLUS' || p.type === 'VDS'),
     );
     if (!newPlan) {
       throw new BadRequestException(`VPS plan '${dto.newPlanId}' not found`);

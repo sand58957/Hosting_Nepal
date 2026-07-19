@@ -35,6 +35,7 @@ interface VPSPlan {
   contaboProductId?: string
   features?: string[]
   isStorage?: boolean
+  diskType?: 'SSD' | 'NVMe'
 }
 
 // Fallback OS list (legacy slugs the backend maps). Replaced at runtime by the
@@ -62,6 +63,7 @@ const VPSOrderPage = () => {
   const router = useRouter()
 
   const [plans, setPlans] = useState<VPSPlan[]>([])
+  const [plusPlans, setPlusPlans] = useState<VPSPlan[]>([])
   const [storagePlans, setStoragePlans] = useState<VPSPlan[]>([])
   const [osOptions, setOsOptions] = useState(fallbackOsOptions)
   const [loadingPlans, setLoadingPlans] = useState(true)
@@ -93,6 +95,15 @@ const VPSOrderPage = () => {
           'vps-50': { diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s' },
           'vps-60': { diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s' },
         }
+        // Performance VPS specs (Cloud VPS Plus — AMD EPYC, NVMe)
+        const plusSpecs: Record<string, { snapshots: number; bandwidth: string }> = {
+          'vps-plus-4': { snapshots: 1, bandwidth: '500 Mbit/s' },
+          'vps-plus-6': { snapshots: 2, bandwidth: '500 Mbit/s' },
+          'vps-plus-8': { snapshots: 3, bandwidth: '1 Gbit/s' },
+          'vps-plus-12': { snapshots: 3, bandwidth: '1 Gbit/s' },
+          'vps-plus-16': { snapshots: 3, bandwidth: '1 Gbit/s' },
+          'vps-plus-18': { snapshots: 3, bandwidth: '1 Gbit/s' },
+        }
         // Storage VPS specs (SSD-only, storage-optimised)
         const storageSpecs: Record<string, { snapshots: number; bandwidth: string }> = {
           'storage-vps-10': { snapshots: 0, bandwidth: '200 Mbit/s' },
@@ -114,6 +125,28 @@ const VPSOrderPage = () => {
               diskSsd: extra.diskSsd ?? 0,
               snapshots: extra.snapshots || 1,
               bandwidth: extra.bandwidth || '200 Mbit/s',
+              price: p.priceMonthly,
+              priceYearly: p.priceYearly,
+              popular: p.popular,
+              contaboProductId: p.contaboProductId,
+              features: p.features || [],
+            }
+          })
+
+        const plusVpsPlans = raw
+          .filter((p: any) => p.type === 'VPS_PLUS')
+          .map((p: any) => {
+            const extra = plusSpecs[p.id] || {}
+            return {
+              id: p.id,
+              name: p.name,
+              cpu: p.specs?.cpuCores || 0,
+              ram: p.specs?.ramGB || 0,
+              disk: p.specs?.diskGB || 0,
+              diskSsd: 0,
+              diskType: 'NVMe' as const,
+              snapshots: extra.snapshots ?? 1,
+              bandwidth: extra.bandwidth || '500 Mbit/s',
               price: p.priceMonthly,
               priceYearly: p.priceYearly,
               popular: p.popular,
@@ -145,15 +178,24 @@ const VPSOrderPage = () => {
           })
 
         setPlans(vpsPlans)
+        setPlusPlans(plusVpsPlans)
         setStoragePlans(storageVpsPlans)
       } catch {
         setPlans([
-          { id: 'vps-10', name: 'VPS 4', cpu: 4, ram: 8, disk: 100, diskSsd: 0, snapshots: 1, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280 },
-          { id: 'vps-20', name: 'VPS 6', cpu: 6, ram: 12, disk: 200, diskSsd: 0, snapshots: 2, bandwidth: '300 Mbit/s', price: 1674, priceYearly: 16740, popular: true },
-          { id: 'vps-30', name: 'VPS 8', cpu: 8, ram: 24, disk: 300, diskSsd: 0, snapshots: 3, bandwidth: '600 Mbit/s', price: 3125, priceYearly: 31250 },
-          { id: 'vps-40', name: 'VPS 12', cpu: 12, ram: 48, disk: 400, diskSsd: 0, snapshots: 3, bandwidth: '800 Mbit/s', price: 5580, priceYearly: 55800 },
-          { id: 'vps-50', name: 'VPS 16', cpu: 16, ram: 64, disk: 500, diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s', price: 8277, priceYearly: 82770 },
-          { id: 'vps-60', name: 'VPS 18', cpu: 18, ram: 96, disk: 600, diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s', price: 10937, priceYearly: 109370 },
+          { id: 'vps-10', name: 'Cloud VPS 4', cpu: 4, ram: 8, disk: 100, diskSsd: 0, snapshots: 1, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280 },
+          { id: 'vps-20', name: 'Cloud VPS 6', cpu: 6, ram: 12, disk: 200, diskSsd: 0, snapshots: 2, bandwidth: '300 Mbit/s', price: 1674, priceYearly: 16740, popular: true },
+          { id: 'vps-30', name: 'Cloud VPS 8', cpu: 8, ram: 24, disk: 300, diskSsd: 0, snapshots: 3, bandwidth: '600 Mbit/s', price: 3125, priceYearly: 31250 },
+          { id: 'vps-40', name: 'Cloud VPS 12', cpu: 12, ram: 48, disk: 400, diskSsd: 0, snapshots: 3, bandwidth: '800 Mbit/s', price: 5580, priceYearly: 55800 },
+          { id: 'vps-50', name: 'Cloud VPS 16', cpu: 16, ram: 64, disk: 500, diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s', price: 8277, priceYearly: 82770 },
+          { id: 'vps-60', name: 'Cloud VPS 18', cpu: 18, ram: 96, disk: 600, diskSsd: 0, snapshots: 3, bandwidth: '1 Gbit/s', price: 10937, priceYearly: 109370 },
+        ])
+        setPlusPlans([
+          { id: 'vps-plus-4', name: 'Cloud VPS Plus 4', cpu: 4, ram: 8, disk: 150, diskSsd: 0, diskType: 'NVMe', snapshots: 1, bandwidth: '500 Mbit/s', price: 3023, priceYearly: 30230 },
+          { id: 'vps-plus-6', name: 'Cloud VPS Plus 6', cpu: 6, ram: 12, disk: 300, diskSsd: 0, diskType: 'NVMe', snapshots: 2, bandwidth: '500 Mbit/s', price: 4278, priceYearly: 42780, popular: true },
+          { id: 'vps-plus-8', name: 'Cloud VPS Plus 8', cpu: 8, ram: 24, disk: 450, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 7812, priceYearly: 78120 },
+          { id: 'vps-plus-12', name: 'Cloud VPS Plus 12', cpu: 12, ram: 48, disk: 600, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 13206, priceYearly: 132060 },
+          { id: 'vps-plus-16', name: 'Cloud VPS Plus 16', cpu: 16, ram: 64, disk: 750, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 17670, priceYearly: 176700 },
+          { id: 'vps-plus-18', name: 'Cloud VPS Plus 18', cpu: 18, ram: 96, disk: 900, diskSsd: 0, diskType: 'NVMe', snapshots: 3, bandwidth: '1 Gbit/s', price: 22134, priceYearly: 221340 },
         ])
         setStoragePlans([
           { id: 'storage-vps-10', name: 'Storage VPS 10', cpu: 2, ram: 4, disk: 300, diskSsd: 0, snapshots: 0, bandwidth: '200 Mbit/s', price: 1228, priceYearly: 12280, isStorage: true },
@@ -241,7 +283,7 @@ const VPSOrderPage = () => {
             {[
               { icon: 'tabler-cpu', label: `${plan.cpu} vCPU Cores`, sub: undefined as string | undefined },
               { icon: 'tabler-device-desktop-analytics', label: `${plan.ram} GB RAM`, sub: undefined as string | undefined },
-              { icon: 'tabler-database', label: `${plan.disk} GB SSD`, sub: undefined as string | undefined },
+              { icon: 'tabler-database', label: `${plan.disk} GB ${plan.diskType || 'SSD'}`, sub: undefined as string | undefined },
               { icon: 'tabler-camera', label: `${plan.snapshots ?? 0} Snapshot${(plan.snapshots ?? 0) === 1 ? '' : 's'}`, sub: undefined as string | undefined },
               { icon: 'tabler-network', label: `${plan.bandwidth || '200 Mbit/s'} Port`, sub: undefined as string | undefined },
               { icon: 'tabler-transfer', label: 'Unlimited Traffic', sub: undefined as string | undefined },
@@ -300,10 +342,24 @@ const VPSOrderPage = () => {
           </Grid>
         ) : (
           <>
-            <Typography variant='subtitle1' fontWeight={700} sx={{ mb: 2 }}>Virtual Private Servers</Typography>
+            <Typography variant='subtitle1' fontWeight={700} sx={{ mb: 0.5 }}>Core VPS</Typography>
+            <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+              Cost-efficient virtual private servers for lighter workloads.
+            </Typography>
             <Grid container spacing={4}>
               {plans.map(renderPlanCard)}
             </Grid>
+            {plusPlans.length > 0 && (
+              <>
+                <Typography variant='subtitle1' fontWeight={700} sx={{ mt: 5, mb: 0.5 }}>Performance VPS</Typography>
+                <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+                  Performance-optimised instances with AMD EPYC CPUs and fast NVMe drives.
+                </Typography>
+                <Grid container spacing={4}>
+                  {plusPlans.map(renderPlanCard)}
+                </Grid>
+              </>
+            )}
             {storagePlans.length > 0 && (
               <>
                 <Typography variant='subtitle1' fontWeight={700} sx={{ mt: 5, mb: 0.5 }}>Storage VPS</Typography>

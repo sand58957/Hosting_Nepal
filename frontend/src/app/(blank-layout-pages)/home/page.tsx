@@ -95,29 +95,35 @@ const faqs = [
 ]
 
 const popularTlds = ['.com', '.np', '.com.np', '.net', '.org', '.in', '.xyz', '.io']
-const planTabs = ['WORDPRESS', 'VPS', 'STORAGE_VPS', 'VDS', 'DEDICATED']
-const planTabLabels = ['WordPress', 'VPS', 'Storage VPS', 'VDS', 'Dedicated']
+const planTabs = ['WORDPRESS', 'VPS', 'VPS_PLUS', 'VDS', 'STORAGE_VPS', 'DEDICATED']
+const planTabLabels = ['WordPress', 'Core VPS', 'Performance VPS', 'Max Performance VPS', 'Storage VPS', 'Dedicated']
 
 const fallbackPlans: Plan[] = [
   { id: 'wp-starter', name: 'WP StartUp', type: 'WORDPRESS', priceMonthly: 1254, priceYearly: 7632, currency: 'NPR', features: [], specs: { diskGB: 10 }, },
   { id: 'wp-essential', name: 'WP Essential', type: 'WORDPRESS', priceMonthly: 1354, priceYearly: 8592, currency: 'NPR', features: [], specs: { diskGB: 20 }, },
   { id: 'wp-business', name: 'WP Business', type: 'WORDPRESS', priceMonthly: 1613, priceYearly: 11460, currency: 'NPR', features: [], specs: { diskGB: 30 }, popular: true },
   { id: 'wp-developer', name: 'WP Developer', type: 'WORDPRESS', priceMonthly: 1893, priceYearly: 14340, currency: 'NPR', features: [], specs: { diskGB: 40 }, },
-  { id: 'vps-10', name: 'VPS 4', type: 'VPS', priceMonthly: 1228, priceYearly: 12280, currency: 'NPR', features: [], specs: { diskGB: 100, cpuCores: 4, ramGB: 8 }, },
-  { id: 'vps-20', name: 'VPS 6', type: 'VPS', priceMonthly: 1674, priceYearly: 16740, currency: 'NPR', features: [], specs: { diskGB: 200, cpuCores: 6, ramGB: 12 }, popular: true },
-  { id: 'vps-30', name: 'VPS 8', type: 'VPS', priceMonthly: 3125, priceYearly: 31250, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 8, ramGB: 24 }, },
-  { id: 'vps-40', name: 'VPS 12', type: 'VPS', priceMonthly: 5580, priceYearly: 55800, currency: 'NPR', features: [], specs: { diskGB: 400, cpuCores: 12, ramGB: 48 }, },
-  { id: 'vps-50', name: 'VPS 16', type: 'VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 500, cpuCores: 16, ramGB: 64 }, },
-  { id: 'vps-60', name: 'VPS 18', type: 'VPS', priceMonthly: 10937, priceYearly: 109370, currency: 'NPR', features: [], specs: { diskGB: 600, cpuCores: 18, ramGB: 96 }, },
+  { id: 'vps-10', name: 'Cloud VPS 4', type: 'VPS', priceMonthly: 1228, priceYearly: 12280, currency: 'NPR', features: [], specs: { diskGB: 100, cpuCores: 4, ramGB: 8 }, },
+  { id: 'vps-20', name: 'Cloud VPS 6', type: 'VPS', priceMonthly: 1674, priceYearly: 16740, currency: 'NPR', features: [], specs: { diskGB: 200, cpuCores: 6, ramGB: 12 }, popular: true },
+  { id: 'vps-30', name: 'Cloud VPS 8', type: 'VPS', priceMonthly: 3125, priceYearly: 31250, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 8, ramGB: 24 }, },
+  { id: 'vps-40', name: 'Cloud VPS 12', type: 'VPS', priceMonthly: 5580, priceYearly: 55800, currency: 'NPR', features: [], specs: { diskGB: 400, cpuCores: 12, ramGB: 48 }, },
+  { id: 'vps-50', name: 'Cloud VPS 16', type: 'VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 500, cpuCores: 16, ramGB: 64 }, },
+  { id: 'vps-60', name: 'Cloud VPS 18', type: 'VPS', priceMonthly: 10937, priceYearly: 109370, currency: 'NPR', features: [], specs: { diskGB: 600, cpuCores: 18, ramGB: 96 }, },
+  { id: 'vps-plus-4', name: 'Cloud VPS Plus 4', type: 'VPS_PLUS', priceMonthly: 3023, priceYearly: 30230, currency: 'NPR', features: [], specs: { diskGB: 150, cpuCores: 4, ramGB: 8 }, },
+  { id: 'vps-plus-6', name: 'Cloud VPS Plus 6', type: 'VPS_PLUS', priceMonthly: 4278, priceYearly: 42780, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 6, ramGB: 12 }, popular: true },
+  { id: 'vps-plus-8', name: 'Cloud VPS Plus 8', type: 'VPS_PLUS', priceMonthly: 7812, priceYearly: 78120, currency: 'NPR', features: [], specs: { diskGB: 450, cpuCores: 8, ramGB: 24 }, },
+  { id: 'vps-plus-12', name: 'Cloud VPS Plus 12', type: 'VPS_PLUS', priceMonthly: 13206, priceYearly: 132060, currency: 'NPR', features: [], specs: { diskGB: 600, cpuCores: 12, ramGB: 48 }, },
+  { id: 'vps-plus-16', name: 'Cloud VPS Plus 16', type: 'VPS_PLUS', priceMonthly: 17670, priceYearly: 176700, currency: 'NPR', features: [], specs: { diskGB: 750, cpuCores: 16, ramGB: 64 }, },
+  { id: 'vps-plus-18', name: 'Cloud VPS Plus 18', type: 'VPS_PLUS', priceMonthly: 22134, priceYearly: 221340, currency: 'NPR', features: [], specs: { diskGB: 900, cpuCores: 18, ramGB: 96 }, },
   { id: 'storage-vps-10', name: 'Storage VPS 10', type: 'STORAGE_VPS', priceMonthly: 1228, priceYearly: 12280, currency: 'NPR', features: [], specs: { diskGB: 300, cpuCores: 2, ramGB: 4 }, },
   { id: 'storage-vps-30', name: 'Storage VPS 30', type: 'STORAGE_VPS', priceMonthly: 3125, priceYearly: 31250, currency: 'NPR', features: [], specs: { diskGB: 1000, cpuCores: 6, ramGB: 18 }, },
   { id: 'storage-vps-40', name: 'Storage VPS 40', type: 'STORAGE_VPS', priceMonthly: 5580, priceYearly: 55800, currency: 'NPR', features: [], specs: { diskGB: 1200, cpuCores: 8, ramGB: 30 }, },
   { id: 'storage-vps-50', name: 'Storage VPS 50', type: 'STORAGE_VPS', priceMonthly: 8277, priceYearly: 82770, currency: 'NPR', features: [], specs: { diskGB: 1400, cpuCores: 14, ramGB: 50 }, },
-  { id: 'vds-s', name: 'VDS S', type: 'VDS', priceMonthly: 8742, priceYearly: 87420, currency: 'NPR', features: [], specs: { diskGB: 180, cpuCores: 6, ramGB: 24 }, },
-  { id: 'vds-m', name: 'VDS M', type: 'VDS', priceMonthly: 10974, priceYearly: 109740, currency: 'NPR', features: [], specs: { diskGB: 240, cpuCores: 8, ramGB: 32 }, popular: true },
-  { id: 'vds-l', name: 'VDS L', type: 'VDS', priceMonthly: 15438, priceYearly: 154380, currency: 'NPR', features: [], specs: { diskGB: 360, cpuCores: 12, ramGB: 48 }, },
-  { id: 'vds-xl', name: 'VDS XL', type: 'VDS', priceMonthly: 21018, priceYearly: 210180, currency: 'NPR', features: [], specs: { diskGB: 480, cpuCores: 16, ramGB: 64 }, },
-  { id: 'vds-xxl', name: 'VDS XXL', type: 'VDS', priceMonthly: 31062, priceYearly: 310620, currency: 'NPR', features: [], specs: { diskGB: 720, cpuCores: 24, ramGB: 96 }, },
+  { id: 'vds-s', name: 'Cloud VDS S', type: 'VDS', priceMonthly: 8742, priceYearly: 87420, currency: 'NPR', features: [], specs: { diskGB: 180, cpuCores: 6, ramGB: 24 }, },
+  { id: 'vds-m', name: 'Cloud VDS M', type: 'VDS', priceMonthly: 10974, priceYearly: 109740, currency: 'NPR', features: [], specs: { diskGB: 240, cpuCores: 8, ramGB: 32 }, popular: true },
+  { id: 'vds-l', name: 'Cloud VDS L', type: 'VDS', priceMonthly: 15438, priceYearly: 154380, currency: 'NPR', features: [], specs: { diskGB: 360, cpuCores: 12, ramGB: 48 }, },
+  { id: 'vds-xl', name: 'Cloud VDS XL', type: 'VDS', priceMonthly: 21018, priceYearly: 210180, currency: 'NPR', features: [], specs: { diskGB: 480, cpuCores: 16, ramGB: 64 }, },
+  { id: 'vds-xxl', name: 'Cloud VDS XXL', type: 'VDS', priceMonthly: 31062, priceYearly: 310620, currency: 'NPR', features: [], specs: { diskGB: 720, cpuCores: 24, ramGB: 96 }, },
   { id: 'ded-1', name: 'DS Intel Xeon E3', type: 'DEDICATED', priceMonthly: 16956, priceYearly: 169560, currency: 'NPR', features: [], specs: { diskGB: 500, cpuCores: 4, ramGB: 8 }, },
   { id: 'ded-2', name: 'DS Intel Xeon E5', type: 'DEDICATED', priceMonthly: 17949, priceYearly: 179490, currency: 'NPR', features: [], specs: { diskGB: 1000, cpuCores: 8, ramGB: 16 }, popular: true },
   { id: 'ded-3', name: 'DS Dual Xeon E5', type: 'DEDICATED', priceMonthly: 23139, priceYearly: 231390, currency: 'NPR', features: [], specs: { diskGB: 2000, cpuCores: 16, ramGB: 32 }, },

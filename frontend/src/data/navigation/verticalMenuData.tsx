@@ -454,7 +454,7 @@ const verticalMenuData = (role?: string): VerticalMenuDataType[] => [
             ]
           },
           {
-            label: 'VDS Servers',
+            label: 'Max Performance VPS',
             icon: 'tabler-cpu',
             children: [
               {
